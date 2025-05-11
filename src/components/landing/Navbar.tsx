@@ -33,7 +33,7 @@ export function Navbar() {
 
         <div className="flex items-center space-x-2">
           <Button variant="accent" size="sm" asChild>
-            <Link href="#cara-kerja">Laporkan Sekarang</Link>
+            <Link href="/lapor">Laporkan Sekarang</Link>
           </Button>
           <Sheet>
             <SheetTrigger asChild>
@@ -57,6 +57,9 @@ export function Navbar() {
                     {item.label}
                   </Link>
                 ))}
+                 <Button variant="accent" size="lg" asChild className="mt-4">
+                    <Link href="/lapor">Laporkan Sekarang</Link>
+                  </Button>
               </nav>
             </SheetContent>
           </Sheet>

@@ -27,7 +27,7 @@ export function HeroSection() {
         </p>
         <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
           <Button variant="accent" size="lg" asChild>
-            <Link href="#cara-kerja">Laporkan Masalah</Link>
+            <Link href="/lapor">Laporkan Masalah</Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
             <Link href="#visi-misi">Pelajari Lebih Lanjut</Link>
