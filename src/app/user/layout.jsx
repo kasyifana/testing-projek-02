@@ -3,11 +3,24 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import { Home, FileText, History, Bell, User, Book, HelpCircle, Star, LogOut, X } from 'lucide-react';
+import { Home, FileText, History, Bell, User, Book, HelpCircle, Star, LogOut, X, UserCircle, Trash } from 'lucide-react';
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function UserLayout({ children }) {
   const pathname = usePathname();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+
+  // Dummy user data (this would come from a real API/auth context in production)
+  const DUMMY_USER = {
+    name: 'User Biasa',
+    email: 'tes@gmail.com',
+    phone: '081234567890',
+    joinDate: '01 January 2024'
+  };
 
   const menuGroups = {
     laporan: [
@@ -42,6 +55,70 @@ export default function UserLayout({ children }) {
     { id: 2, title: "Tanggapan baru pada laporan Anda", time: "1 jam yang lalu", read: false },
     { id: 3, title: "Status laporan Anda telah diubah", time: "1 hari yang lalu", read: true },
   ];
+
+  // Profile Popup Component
+  const ProfilePopup = () => {
+    const handleOutsideClick = (e) => {
+      if (e.target.classList.contains('overlay')) {
+        setShowProfilePopup(false);
+      }
+    };
+
+    return (
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 overlay" 
+        onClick={handleOutsideClick}
+      >
+        <div className="max-w-2xl w-full mx-4 md:mx-auto" onClick={e => e.stopPropagation()}>
+          <Card className="p-6 space-y-6 bg-white">
+            <div className="flex items-center justify-between pb-2">
+              <h1 className="text-2xl font-bold">Profil & Privasi</h1>
+              <button 
+                onClick={() => setShowProfilePopup(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-4 pb-6 border-b">
+              <UserCircle className="w-20 h-20 text-gray-400" />
+              <div>
+                <h2 className="text-xl font-semibold">{DUMMY_USER.name}</h2>
+                <p className="text-gray-500">Bergabung sejak {DUMMY_USER.joinDate}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label>Nama Lengkap</Label>
+                <Input defaultValue={DUMMY_USER.name} />
+              </div>
+              
+              <div>
+                <Label>Email</Label>
+                <Input defaultValue={DUMMY_USER.email} type="email" />
+              </div>
+              
+              <div>
+                <Label>Nomor Telepon</Label>
+                <Input defaultValue={DUMMY_USER.phone} />
+              </div>
+
+              <Button className="w-full">Simpan Perubahan</Button>
+            </div>
+
+            <div className="pt-6 border-t">
+              <Button variant="destructive" className="w-full">
+                <Trash className="w-4 h-4 mr-2" />
+                Hapus Akun
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  };
 
   // Header component with profile and dropdown notifications
   const Header = () => (
@@ -106,15 +183,15 @@ export default function UserLayout({ children }) {
           )}
         </div>
         
-        <Link 
-          href="/user/profile"
-          className={`flex items-center space-x-2 p-2 rounded-full ${pathname === '/user/profile' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+        <button
+          onClick={() => setShowProfilePopup(true)}
+          className="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-50"
         >
           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
             <User className="h-5 w-5 text-white" />
           </div>
           <span className="font-medium text-gray-700">Profil</span>
-        </Link>
+        </button>
       </div>
     </header>
   );
@@ -160,6 +237,8 @@ export default function UserLayout({ children }) {
         <Header />
         <main className="flex-1 p-10">{children}</main>
       </div>
+      
+      {showProfilePopup && <ProfilePopup />}
     </div>
   );
 }
