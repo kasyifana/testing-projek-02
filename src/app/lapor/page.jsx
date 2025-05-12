@@ -1,6 +1,8 @@
 
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -26,7 +28,7 @@ import {
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { useToast } from '@/hooks/use-toast';
-import { Paperclip, Send } from 'lucide-react';
+import { Paperclip, Send, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const reportSchema = z.object({
@@ -44,7 +46,7 @@ const reportSchema = z.object({
     .min(5, { message: 'Lokasi minimal 5 karakter.' })
     .max(100, { message: 'Lokasi maksimal 100 karakter.' }),
   image: z
-    .custom() // Removed FileList type
+    .custom() 
     .refine((files) => files === undefined || files === null || files.length === 0 || (files?.[0]?.size || 0) <= 5 * 1024 * 1024, {
       message: 'Ukuran gambar maksimal 5MB.',
     })
@@ -73,6 +75,27 @@ const problemCategories = [
 
 export default function LaporPage() {
   const { toast } = useToast();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const loggedInStatus = localStorage.getItem('isLoggedIn') === 'true';
+      if (!loggedInStatus) {
+        toast({
+          title: 'Akses Ditolak',
+          description: 'Anda harus login untuk membuat laporan.',
+          variant: 'destructive',
+        });
+        router.push('/login');
+      } else {
+        setIsAuthenticated(true);
+      }
+      setIsLoading(false);
+    }
+  }, [router, toast]);
+
   const form = useForm({
     resolver: zodResolver(reportSchema),
     defaultValues: {
@@ -86,23 +109,30 @@ export default function LaporPage() {
 
   function onSubmit(data) {
     console.log(data);
-    // For file handling, you'd typically use FormData:
-    // const formData = new FormData();
-    // formData.append('title', data.title);
-    // formData.append('description', data.description);
-    // formData.append('category', data.category);
-    // formData.append('location', data.location);
-    // if (data.image && data.image.length > 0) {
-    //   formData.append('image', data.image[0]);
-    // }
-    // Then send formData to your backend API.
-
     toast({
       title: 'Laporan Terkirim!',
       description: 'Terima kasih atas laporan Anda. Kami akan segera menindaklanjutinya.',
       variant: 'default',
     });
     form.reset();
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Memeriksa status login Anda...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    // This case should ideally be handled by the redirect, but as a fallback:
+    return (
+      <div className="flex flex-col min-h-screen items-center justify-center">
+        <p className="text-destructive">Anda tidak diautentikasi.</p>
+      </div>
+    );
   }
 
   return (
