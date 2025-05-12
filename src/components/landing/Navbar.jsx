@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, MessageSquareWarning } from 'lucide-react';
+import { Menu, MessageSquareWarning, LogIn } from 'lucide-react';
 import { LaporKampusLogo } from '@/components/icons/LaporKampusLogo';
 
 const navItems = [
@@ -34,7 +34,10 @@ export function Navbar() {
 
         <div className="flex items-center space-x-2">
           <Button variant="accent" size="sm" asChild>
-            <Link href="/lapor">Laporkan Sekarang</Link>
+            <Link href="/login">
+              <LogIn className="mr-2 h-4 w-4" />
+              Login
+            </Link>
           </Button>
           <Sheet>
             <SheetTrigger asChild>
@@ -59,7 +62,10 @@ export function Navbar() {
                   </Link>
                 ))}
                  <Button variant="accent" size="lg" asChild className="mt-4">
-                    <Link href="/lapor">Laporkan Sekarang</Link>
+                    <Link href="/login">
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Login
+                    </Link>
                   </Button>
               </nav>
             </SheetContent>

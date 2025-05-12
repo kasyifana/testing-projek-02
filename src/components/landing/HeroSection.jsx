@@ -2,6 +2,7 @@
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { LogIn } from 'lucide-react';
 
 export function HeroSection() {
   return (
@@ -28,7 +29,10 @@ export function HeroSection() {
         </p>
         <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
           <Button variant="accent" size="lg" asChild>
-            <Link href="/lapor">Laporkan Masalah</Link>
+            <Link href="/login">
+              <LogIn className="mr-2 h-5 w-5" />
+              Login Sekarang
+            </Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
             <Link href="#visi-misi">Pelajari Lebih Lanjut</Link>
