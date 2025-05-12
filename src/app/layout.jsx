@@ -1,4 +1,3 @@
-
 import { Geist, Geist_Mono } from 'next/font/google'; // Corrected import name
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Added Toaster
@@ -15,7 +14,12 @@ const geistMono = Geist_Mono({ // Corrected function call
 
 export const metadata = {
   title: 'Lapor Kampus',
-  description: 'Sampaikan aspirasi, wujudkan kampus ideal.',
+  description: 'Platform partisipasi mahasiswa untuk melaporkan berbagai isu dan permasalahan di lingkungan kampus',
+  icons: {
+    icon: '/LogoLaporKampus.png',
+    apple: '/LogoLaporKampus.png',
+    shortcut: '/LogoLaporKampus.png',
+  },
 };
 
 export default function RootLayout({

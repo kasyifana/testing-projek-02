@@ -39,9 +39,10 @@ export function LoginDialog({ isOpen, onClose }) {
         variant: 'default',
       });
       
-      // Mengubah pengecekan email admin yang sesuai dengan DUMMY_USERS
       if (foundUser.email === 'admin@gmail.com') {
         window.location.href = '/admin/dashboard';
+      } else {
+        window.location.href = '/user/dashboard';
       }
       
       onClose();
