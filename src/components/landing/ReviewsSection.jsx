@@ -32,8 +32,8 @@ const reviews = [
 export function ReviewsSection() {
   return (
     <section id="ulasan" className="py-16 sm:py-24 bg-background">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
+      <div className="container mx-auto px-6 lg:px-8">
+        <div className="text-center mb-16">
           <Users className="h-12 w-12 mx-auto mb-4 text-primary" />
           <h2 className="text-3xl sm:text-4xl font-bold text-primary">
             Apa Kata Mereka?
@@ -42,10 +42,10 @@ export function ReviewsSection() {
             Dengarkan pengalaman mahasiswa lain yang telah menggunakan Lapor Kampus.
           </p>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
           {reviews.map((review, index) => (
-            <Card key={index} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
-              <CardHeader className="relative pb-4">
+            <Card key={index} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col p-2">
+              <CardHeader className="relative pb-6">
                 <Quote className="absolute top-4 right-4 h-10 w-10 text-primary/20" />
                 <div className="flex items-center space-x-4">
                   <Avatar className="h-16 w-16 border-2 border-primary">
@@ -58,10 +58,10 @@ export function ReviewsSection() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex-grow">
+              <CardContent className="flex-grow px-6">
                 <p className="text-md text-muted-foreground leading-relaxed italic">"{review.text}"</p>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="px-6">
                 <div className="flex items-center">
                   {Array(5).fill(0).map((_, i) => (
                     <Star

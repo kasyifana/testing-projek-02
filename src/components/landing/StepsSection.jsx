@@ -28,8 +28,8 @@ const steps = [
 export function StepsSection() {
   return (
     <section id="cara-kerja" className="py-16 sm:py-24 bg-secondary">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
+      <div className="container mx-auto px-6 lg:px-8">
+        <div className="text-center mb-16">
           <Workflow className="h-12 w-12 mx-auto mb-4 text-primary" />
           <h2 className="text-3xl sm:text-4xl font-bold text-primary">
             Bagaimana Cara Kerja Lapor Kampus?
@@ -38,16 +38,16 @@ export function StepsSection() {
             Laporkan masalah di kampusmu dengan mudah melalui beberapa langkah sederhana.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
           {steps.map((step, index) => (
-            <Card key={index} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
-              <CardHeader className="items-center text-center">
-                <div className="p-4 bg-accent/10 rounded-full mb-4">
+            <Card key={index} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col p-2">
+              <CardHeader className="items-center text-center pb-6">
+                <div className="p-4 bg-accent/10 rounded-full mb-6">
                   {step.icon}
                 </div>
                 <CardTitle className="text-xl text-primary">{step.title}</CardTitle>
               </CardHeader>
-              <CardContent className="text-center flex-grow">
+              <CardContent className="text-center flex-grow px-6">
                 <CardDescription className="text-md leading-relaxed">{step.description}</CardDescription>
               </CardContent>
             </Card>

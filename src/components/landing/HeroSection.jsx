@@ -12,7 +12,7 @@ export function HeroSection() {
 
   return (
     <section id="hero" className="relative w-full py-20 md:py-32 bg-card text-card-foreground overflow-hidden">
-      <div className="absolute inset-0 opacity-5">
+      <div className="absolute inset-0 opacity-15">
          <Image
             src="https://picsum.photos/1920/1080"
             alt="Abstract background"

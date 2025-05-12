@@ -17,7 +17,7 @@ const loginSchema = z.object({
 
 const DUMMY_USERS = [
   { email: 'tes@gmail.com', password: '123123', name: 'User Biasa' },
-  { email: 'admin@example.com', password: 'adminpassword', name: 'Admin Kampus' },
+  { email: 'admin@gmail.com', password: '123123', name: 'Kemahasiswaan' },
 ];
 
 export function LoginDialog({ isOpen, onClose }) {
@@ -38,6 +38,12 @@ export function LoginDialog({ isOpen, onClose }) {
         description: `Selamat datang kembali, ${foundUser.name}.`,
         variant: 'default',
       });
+      
+      // Mengubah pengecekan email admin yang sesuai dengan DUMMY_USERS
+      if (foundUser.email === 'admin@gmail.com') {
+        window.location.href = '/admin/dashboard';
+      }
+      
       onClose();
       form.reset();
     } else {

@@ -91,7 +91,7 @@ export function Navbar() {
           )}
         </nav>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4 mx-6">
           {isLoggedIn ? (
             <>
               <span className="text-sm text-muted-foreground hidden sm:inline-block">
