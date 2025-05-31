@@ -19,6 +19,7 @@ export const metadata = {
     icon: '/LogoLaporKampus.png',
     apple: '/LogoLaporKampus.png',
     shortcut: '/LogoLaporKampus.png',
+    //test
   },
 };
 
