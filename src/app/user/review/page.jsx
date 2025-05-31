@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,38 @@ const DUMMY_REVIEWS = [
 ];
 
 export default function Review() {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+
+  const handleStarClick = (value) => {
+    setRating(value);
+  };
+
+  const handleCommentChange = (e) => {
+    setComment(e.target.value);
+  };
+
+  const handleSubmit = () => {
+    if (rating === 0) {
+      alert("Silakan berikan rating terlebih dahulu");
+      return;
+    }
+
+    // Prepare data for submission
+    const reviewData = {
+      rating,
+      comment,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    console.log("Review submitted:", reviewData);
+    // Here you would send the data to your API endpoint
+    
+    // Reset form
+    setRating(0);
+    setComment("");
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Review Sistem</h1>
@@ -30,18 +63,25 @@ export default function Review() {
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-4">Berikan Review Anda</h2>
         <div className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             {[1, 2, 3, 4, 5].map((star) => (
-              <button key={star} className="text-yellow-400 hover:text-yellow-500">
-                <Star className="w-8 h-8" fill="currentColor" />
+              <button 
+                key={star} 
+                onClick={() => handleStarClick(star)}
+                className={`transition-colors ${rating >= star ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`}
+              >
+                <Star className="w-8 h-8" fill={rating >= star ? "currentColor" : "none"} />
               </button>
             ))}
+            {rating > 0 && <span className="ml-2 text-sm">{rating} dari 5</span>}
           </div>
           <Textarea 
             placeholder="Bagikan pengalaman Anda menggunakan sistem ini..." 
             className="min-h-[100px]"
+            value={comment}
+            onChange={handleCommentChange}
           />
-          <Button>Kirim Review</Button>
+          <Button onClick={handleSubmit}>Kirim Review</Button>
         </div>
       </Card>
 
