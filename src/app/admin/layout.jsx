@@ -20,10 +20,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const sidebarLinks = [
   { title: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-  { title: 'Manajemen User', href: '/admin/users', icon: Users },
   { title: 'Manajemen Laporan', href: '/admin/reports', icon: FileText },
   { title: 'Peringatan Sistem', href: '/admin/warnings', icon: AlertCircle },
   { title: 'Audit Log', href: '/admin/audit', icon: History },
+  { title: 'Manajemen User', href: '/admin/users', icon: Users },
   { title: 'Feedback', href: '/admin/feedback', icon: MessageSquare },
   { title: 'Pengaturan', href: '/admin/settings', icon: Settings },
 ];
@@ -53,7 +53,7 @@ export default function AdminLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-200">
       {/* Mobile sidebar toggle */}
       <button
         onClick={() => setSidebarOpen(!isSidebarOpen)}
@@ -63,22 +63,15 @@ export default function AdminLayout({ children }) {
       </button>
 
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 z-40 h-screen w-64 transform transition-transform duration-200 ease-in-out ${
+      <aside className={`bg-gray-50 fixed left-0 top-0 z-40 h-screen w-64 transform transition-transform duration-200 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0`}>
-        <div className="h-full bg-white border-r flex flex-col">
-          {/* Brand */}
-          <div className="flex items-center gap-2 p-6 border-b">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">A</span>
-            </div>
-            <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-              Admin Panel
-            </h2>
-          </div>
+        <div className="h-full  border-r flex flex-col">
+          
+          
 
           {/* User Profile */}
-          <div className="p-4 border-b">
+          <div className="p-4 border-b bg-white">
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarFallback>AD</AvatarFallback>
@@ -101,8 +94,8 @@ export default function AdminLayout({ children }) {
                   onClick={() => handleNavigation(link.href)}
                   className={`flex items-center w-full p-3 rounded-lg transition-colors ${
                     isActive 
-                      ? 'bg-primary/10 text-primary hover:bg-primary/15' 
-                      : 'hover:bg-gray-100'
+                      ? 'bg-blue-100 text-primary hover:bg-blue-200' 
+                      : 'hover:bg-blue-100'
                   }`}
                 >
                   <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-primary' : ''}`} />
@@ -113,7 +106,7 @@ export default function AdminLayout({ children }) {
           </nav>
 
           {/* Logout button */}
-          <div className="p-4 border-t">
+          <div className="p-4 border-t bg-white">
             <button
               onClick={handleLogout}
               className="flex items-center w-full p-3 rounded-lg hover:bg-red-50 text-red-600 transition-colors"

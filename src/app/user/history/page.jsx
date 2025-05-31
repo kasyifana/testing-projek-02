@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,13 +39,44 @@ const getStatusColor = (status) => {
 };
 
 export default function History() {
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .no-hover-effect,
+      .no-hover-effect *,
+      .no-hover-effect *:hover {
+        scale: none !important;
+        box-shadow: inherit !important;
+        transform: none !important;
+        transition: none !important;
+        transform-style: flat !important;
+      }
+      
+      .no-hover-effect:hover {
+        transform: none !important;
+        scale: 1 !important;
+        transform-origin: center !important;
+      }
+
+      .hover-highlight:hover {
+        background-color: #f5f5f5 !important;
+        transition: background-color 0.2s ease !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Riwayat Laporan Saya</h1>
       
       <div className="space-y-4">
         {DUMMY_REPORTS.map((report) => (
-          <Card key={report.id} className="p-4">
+          <Card key={report.id} className="p-4 no-hover-effect hover-highlight">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-semibold text-lg">{report.title}</h3>

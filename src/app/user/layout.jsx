@@ -198,11 +198,11 @@ export default function UserLayout({ children }) {
 
   return (
     <div className="flex min-h-screen bg-gray-100">
-      <aside className="w-72 bg-white shadow-md flex flex-col justify-between">
+      <aside className="w-72 bg-white shadow-md flex flex-col justify-between sticky top-0 h-screen overflow-y-auto">
         <nav className="flex flex-col gap-y-6 pt-6">
           <div>
             <div className="px-6 py-2">
-              <p className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+              <p className="text-md font-bold text-gray-600 uppercase tracking-wider">
                 Laporan
               </p>
             </div>
@@ -213,7 +213,7 @@ export default function UserLayout({ children }) {
 
           <div>
             <div className="px-6 py-2">
-              <p className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+              <p className="text-md font-bold text-gray-600 uppercase tracking-wider">
                 Akun
               </p>
             </div>

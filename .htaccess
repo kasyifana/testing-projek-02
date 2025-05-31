@@ -1,0 +1,17 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /testing-projek-02-master/
+    
+    # Jika request ke direktori backend/public, arahkan langsung
+    RewriteCond %{REQUEST_URI} ^/backend/public/(.*)
+    RewriteRule ^backend/public/(.*)$ backend/public/$1 [L]
+    
+    # Jika request ke backend tetapi tidak ke backend/public, arahkan ke backend/public
+    RewriteCond %{REQUEST_URI} ^/backend/(.*)
+    RewriteRule ^backend/(.*)$ backend/public/$1 [L]
+    
+    # Semua request lainnya arahkan ke React app
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.html [L]
+</IfModule>

@@ -46,9 +46,9 @@ export function HeroSection() {
           data-ai-hint="abstract texture"
         />
       </div>
-      <div className="container relative z-10 mx-auto px-4">
+      <div className="container relative z-10 mx-auto px-6 md:px-10">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <div className="text-center md:text-left md:w-1/2">
+          <div className="text-center md:text-left md:w-1/2 pl-0 md:pl-4 lg:pl-8">
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -80,7 +80,7 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.6 }}
-              className="mt-10 flex flex-col sm:flex-row justify-center md:justify-start gap-4"
+              className="mt-10 flex flex-col sm:flex-row justify-center md:justify-start gap-4 md:pl-2"
             >
               <Button variant="accent" size="lg" onClick={() => setIsLoginOpen(true)}>
                 <LogIn className="mr-2 h-5 w-5" />
@@ -95,7 +95,7 @@ export function HeroSection() {
             <InfoBoxes />
           </div>
 
-          <div className={`md:w-2/5 ${isMobile ? 'mt-10' : ''}`}>
+          <div className={`md:w-2/5 ${isMobile ? 'mt-10' : ''} md:pr-4 lg:pr-8`}>
             {animationData && (
               <Lottie
                 animationData={animationData}

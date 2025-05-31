@@ -15,6 +15,23 @@ const navItems = [
 	{ label: 'Ulasan', href: '#ulasan' },
 ];
 
+// Separate component for login button to ignore React imports
+const LoginButton = ({ onClick }) => {
+	return (
+		<div className="flex-grow flex justify-center mx-4 max-w-40">
+			<Button
+				onClick={onClick}
+				variant="accent"
+				size="sm"
+				className="px-5 py-2 w-full"
+			>
+				<LogIn className="mr-2 h-4 w-4" />
+				Login
+			</Button>
+		</div>
+	);
+};
+
 export function Navbar() {
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
 	const [userName, setUserName] = useState('');
@@ -94,7 +111,7 @@ export function Navbar() {
 					</nav>
 				</div>
 
-				<div className="flex items-center space-x-4 md:ml-10 lg:ml-20 xl:ml-40">
+				<div className="flex items-center space-x-4 md:space-x-5 ml-4 md:ml-10 lg:ml-16 w-fit">
 					{isLoggedIn ? (
 						<>
 							<span className="text-sm text-muted-foreground hidden sm:inline-block">
@@ -106,14 +123,7 @@ export function Navbar() {
 							</Button>
 						</>
 					) : (
-						<Button
-							onClick={() => setShowLoginDialog(true)}
-							variant="accent"
-							size="sm"
-						>
-							<LogIn className="mr-2 h-4 w-4" />
-							Login
-						</Button>
+						<LoginButton onClick={() => setShowLoginDialog(true)} />
 					)}
 					<Sheet>
 						<SheetTrigger asChild>
