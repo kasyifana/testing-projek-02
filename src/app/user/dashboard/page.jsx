@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Dashboard() {
   const stats = [
@@ -52,10 +53,12 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Beranda Pelapor</h1>
-        <Button variant="accent" className="flex items-center gap-2">
-          <PlusCircle className="h-5 w-5" />
-          Buat Laporan Baru
-        </Button>
+        <Link href="/user/create-report">
+          <Button variant="accent" className="flex items-center gap-2">
+            <PlusCircle className="h-5 w-5" />
+            Buat Laporan Baru
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
@@ -89,9 +92,11 @@ export default function Dashboard() {
           ))}
         </div>
         <div className="mt-4 text-center">
-          <Button variant="link" className="text-primary">
-            Lihat Semua Laporan
-          </Button>
+          <Link href="/user/history">
+            <Button variant="link" className="text-primary">
+              Lihat Semua Laporan
+            </Button>
+          </Link>
         </div>
       </Card>
     </div>

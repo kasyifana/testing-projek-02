@@ -2,25 +2,43 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
-import { Home, FileText, History, Bell, User, Book, HelpCircle, Star, LogOut, X, UserCircle, Trash } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Home, FileText, History, Bell, User, Book, HelpCircle, Star, LogOut, X, UserCircle, Trash, Menu } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DUMMY_USER } from './profile/page';
 
 export default function UserLayout({ children }) {
   const pathname = usePathname();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Dummy user data (this would come from a real API/auth context in production)
-  const DUMMY_USER = {
-    name: 'User Biasa',
-    email: 'tes@gmail.com',
-    phone: '081234567890',
-    joinDate: '01 January 2024'
-  };
+  // Check if we're in a mobile viewport
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    
+    // Initial check
+    checkIfMobile();
+    
+    // Add event listener
+    window.addEventListener('resize', checkIfMobile);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkIfMobile);
+  }, []);
+
+  // Close sidebar when navigating on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [pathname, isMobile]);
 
   const menuGroups = {
     laporan: [
@@ -40,11 +58,11 @@ export default function UserLayout({ children }) {
       href={item.path}
       className={`flex items-center px-6 py-3 text-base transition-colors ${
         pathname === item.path
-          ? 'bg-primary text-white font-medium'
-          : 'text-gray-600 hover:bg-gray-50 hover:text-primary'
+          ? 'bg-primary bg-opacity-10 rounded-lg mx-3 font-medium text-black'
+          : 'text-gray-600 hover:bg-gray-100 hover:rounded-lg hover:mx-3 hover:text-primary'
       }`}
     >
-      <item.icon className="h-5 w-5 mr-3" />
+      <item.icon className={`h-5 w-5 mr-3 ${pathname === item.path ? 'text-primary' : ''}`} />
       <span>{item.label}</span>
     </Link>
   );
@@ -84,7 +102,8 @@ export default function UserLayout({ children }) {
             <div className="flex items-center gap-4 pb-6 border-b">
               <UserCircle className="w-20 h-20 text-gray-400" />
               <div>
-                <h2 className="text-xl font-semibold">{DUMMY_USER.name}</h2>
+                <h2 className="text-xl font-semibold">{DUMMY_USER.username}</h2>
+                <p className="text-gray-500">ID: {DUMMY_USER.id}</p>
                 <p className="text-gray-500">Bergabung sejak {DUMMY_USER.joinDate}</p>
               </div>
             </div>
@@ -122,8 +141,16 @@ export default function UserLayout({ children }) {
 
   // Header component with profile and dropdown notifications
   const Header = () => (
-    <header className="bg-white shadow-sm h-16 flex items-center justify-end px-8">
-      <div className="flex items-center space-x-4">
+    <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 lg:px-8">
+      {isMobile && (
+        <button 
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded-full hover:bg-gray-50"
+        >
+          <Menu className="h-6 w-6 text-gray-600" />
+        </button>
+      )}
+      <div className="flex items-center space-x-4 ml-auto">
         <div className="relative">
           <button 
             onClick={() => setShowNotifications(!showNotifications)}
@@ -185,24 +212,55 @@ export default function UserLayout({ children }) {
         
         <button
           onClick={() => setShowProfilePopup(true)}
-          className="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-50"
+          className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50"
         >
           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
             <User className="h-5 w-5 text-white" />
           </div>
-          <span className="font-medium text-gray-700">Profil</span>
+          <div className="hidden md:block text-left">
+            <p className="font-medium text-gray-700 leading-tight">{DUMMY_USER.username}</p>
+            <p className="text-xs text-gray-500">{DUMMY_USER.id}</p>
+          </div>
         </button>
       </div>
     </header>
   );
-
+  
   return (
     <div className="flex min-h-screen bg-gray-100">
-      <aside className="w-72 bg-white shadow-md flex flex-col justify-between">
+      {/* Mobile sidebar overlay */}
+      {isMobile && sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
+      {/* Responsive sidebar */}
+      <aside 
+        className={`${
+          isMobile 
+            ? `fixed z-40 h-screen w-72 bg-white shadow-md transform transition-transform duration-300 ease-in-out ${
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              }`
+            : 'fixed h-screen w-72 bg-white shadow-md'
+        } flex flex-col justify-between overflow-y-auto`}
+      >
+        {isMobile && (
+          <div className="flex justify-end p-4">
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+        
         <nav className="flex flex-col gap-y-6 pt-6">
           <div>
             <div className="px-6 py-2">
-              <p className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+              <p className="text-md font-bold text-black uppercase tracking-wider">
                 Laporan
               </p>
             </div>
@@ -213,7 +271,7 @@ export default function UserLayout({ children }) {
 
           <div>
             <div className="px-6 py-2">
-              <p className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+              <p className="text-md font-bold text-black uppercase tracking-wider">
                 Akun
               </p>
             </div>
@@ -233,9 +291,11 @@ export default function UserLayout({ children }) {
           </button>
         </div>
       </aside>
-      <div className="flex-1 flex flex-col">
+
+      {/* Main content */}
+      <div className={`flex-1 flex flex-col ${!isMobile ? 'pl-72' : 'pl-0'}`}>
         <Header />
-        <main className="flex-1 p-10">{children}</main>
+        <main className="flex-1 p-4 md:p-10">{children}</main>
       </div>
       
       {showProfilePopup && <ProfilePopup />}

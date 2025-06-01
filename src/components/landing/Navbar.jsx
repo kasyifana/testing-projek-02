@@ -107,9 +107,11 @@ export function Navbar() {
 						</>
 					) : (
 						<Button
+						
 							onClick={() => setShowLoginDialog(true)}
 							variant="accent"
 							size="sm"
+							className="mr-4"
 						>
 							<LogIn className="mr-2 h-4 w-4" />
 							Login

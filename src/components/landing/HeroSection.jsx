@@ -46,9 +46,9 @@ export function HeroSection() {
           data-ai-hint="abstract texture"
         />
       </div>
-      <div className="container relative z-10 mx-auto px-4">
+      <div className="container relative z-10 mx-auto px-6 md:px-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <div className="text-center md:text-left md:w-1/2">
+          <div className="text-center md:text-left md:w-1/2 pl-2 md:pl-4">
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
