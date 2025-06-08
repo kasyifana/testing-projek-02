@@ -1,6 +1,6 @@
 import { Geist, Geist_Mono } from 'next/font/google'; // Corrected import name
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster"; // Added Toaster
+import { Toaster } from '@/components/ui/use-toast'; // Changed import path for Toaster
 
 const geistSans = Geist({ // Corrected function call
   variable: '--font-geist-sans',

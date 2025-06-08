@@ -22,7 +22,7 @@ const stepsData = [
 	},
 	{
 		animationUrl:
-			'https://assets5.lottiefiles.com/packages/lf20_u8o7BL.json', // Message sending animation
+			'https://lottie.host/8984152e-6bf9-4732-b8ae-9a5d9faa7f34/HKhgCo6A5p.json', // Message sending animation
 		title: 'Tindak Lanjut',
 		description:
 			'Laporan diteruskan ke pihak berwenang di kampus untuk diproses dan ditindaklanjuti.',
@@ -30,7 +30,7 @@ const stepsData = [
 	{
 		// Using a different animation that should work more reliably
 		animationUrl:
-			'https://assets3.lottiefiles.com/datafiles/zc3XRzudyWE36ZBJr7PIkkqq0PFIrIBgp4ojqShI/newAnimation.json',
+			'https://lottie.host/6bf0c0e8-a479-411f-885e-abfcccdc84ae/ia0eFiEWKw.json',
 		title: 'Pantau Progres',
 		description:
 			'Kamu bisa memantau status dan progres penyelesaian laporanmu melalui platform.',

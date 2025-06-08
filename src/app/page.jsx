@@ -14,7 +14,9 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Navbar onLoginClick={() => setIsLoginOpen(true)} />
+      <Navbar 
+        onLoginClick={() => setIsLoginOpen(true)} 
+      />
       <main className="flex-grow">
         <HeroSection />
         <VisionMissionSection />

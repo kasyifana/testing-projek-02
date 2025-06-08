@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, LogIn, LogOut } from 'lucide-react';
+import { Menu, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { LaporKampusLogo } from '@/components/icons/LaporKampusLogo';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { LoginDialog } from '@/components/auth/LoginDialog';
+import { RegisterDialog } from '@/components/auth/RegisterDialog';
+import { useLogoutHandler } from '@/components/auth/LogoutDialog';
 
 const navItems = [
 	{ label: 'Visi & Misi', href: '#visi-misi' },
@@ -19,7 +20,8 @@ export function Navbar() {
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
 	const [userName, setUserName] = useState('');
 	const [showLoginDialog, setShowLoginDialog] = useState(false);
-	const router = useRouter();
+	const [showRegisterDialog, setShowRegisterDialog] = useState(false);
+	const { handleLogout } = useLogoutHandler();
 
 	useEffect(() => {
 		// This effect runs only on the client-side
@@ -52,14 +54,12 @@ export function Navbar() {
 		};
 	}, []);
 
-	const handleLogout = () => {
-		if (typeof window !== 'undefined') {
-			localStorage.removeItem('isLoggedIn');
-			localStorage.removeItem('userName');
+	const onLogout = () => {
+		const success = handleLogout();
+		if (success) {
+			setIsLoggedIn(false);
+			setUserName('');
 		}
-		setIsLoggedIn(false);
-		setUserName('');
-		router.push('/login'); // Redirect to login page after logout
 	};
 
 	return (
@@ -100,22 +100,31 @@ export function Navbar() {
 							<span className="text-sm text-muted-foreground hidden sm:inline-block">
 								Halo, {userName}!
 							</span>
-							<Button variant="outline" size="sm" onClick={handleLogout}>
+							<Button variant="outline" size="sm" onClick={onLogout}>
 								<LogOut className="mr-2 h-4 w-4" />
 								Logout
 							</Button>
 						</>
 					) : (
-						<Button
-						
-							onClick={() => setShowLoginDialog(true)}
-							variant="accent"
-							size="sm"
-							className="mr-4"
-						>
-							<LogIn className="mr-2 h-4 w-4" />
-							Login
-						</Button>
+						<>
+							<Button
+								onClick={() => setShowLoginDialog(true)}
+								variant="accent"
+								size="sm"
+								className=""
+							>
+								<LogIn className="mr-2 h-4 w-4" />
+								Login
+							</Button>
+							<Button
+								onClick={() => setShowRegisterDialog(true)}
+								variant="default"
+								size="sm"
+								className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
+							>
+								<UserPlus className="w-4 h-4" /> Register
+							</Button>
+						</>
 					)}
 					<Sheet>
 						<SheetTrigger asChild>
@@ -154,22 +163,32 @@ export function Navbar() {
 									<Button
 										variant="outline"
 										size="lg"
-										onClick={handleLogout}
+										onClick={onLogout}
 										className="mt-4"
 									>
 										<LogOut className="mr-2 h-5 w-5" />
 										Logout
 									</Button>
 								) : (
-									<Button
-										onClick={() => setShowLoginDialog(true)}
-										variant="accent"
-										size="lg"
-										className="mt-4"
-									>
-										<LogIn className="mr-2 h-5 w-5" />
-										Login
-									</Button>
+									<>
+										<Button
+											onClick={() => setShowLoginDialog(true)}
+											variant="accent"
+											size="lg"
+											className="mt-4"
+										>
+											<LogIn className="mr-2 h-5 w-5" />
+											Login
+										</Button>
+										<Button
+											onClick={() => setShowRegisterDialog(true)}
+											variant="default"
+											size="lg"
+											className="mt-4 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
+										>
+											<UserPlus className="w-4 h-4" /> Register
+										</Button>
+									</>
 								)}
 							</nav>
 						</SheetContent>
@@ -179,6 +198,14 @@ export function Navbar() {
 			<LoginDialog
 				isOpen={showLoginDialog}
 				onClose={() => setShowLoginDialog(false)}
+				onRegisterClick={() => {
+					setShowLoginDialog(false);
+					setShowRegisterDialog(true);
+				}}
+			/>
+			<RegisterDialog
+				isOpen={showRegisterDialog}
+				onClose={() => setShowRegisterDialog(false)}
 			/>
 		</header>
 	);

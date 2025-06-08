@@ -4,55 +4,53 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { LogIn, Mail, Lock, X } from 'lucide-react';
+import { Mail, Lock, LogIn, X } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Format email tidak valid.' }),
   password: z.string().min(6, { message: 'Password minimal 6 karakter.' }),
 });
 
-const DUMMY_USERS = [
-  { email: 'tes@gmail.com', password: '123123', name: 'User Biasa' },
-  { email: 'admin@gmail.com', password: '123123', name: 'Kemahasiswaan' },
-];
-
-export function LoginDialog({ isOpen, onClose }) {
+export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
   const { toast } = useToast();
+  const router = useRouter();
   const form = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
 
   function onSubmit(data) {
-    const foundUser = DUMMY_USERS.find(
-      (user) => user.email === data.email && user.password === data.password
-    );
-
-    if (foundUser) {
-      toast({
-        title: 'Login Berhasil!',
-        description: `Selamat datang kembali, ${foundUser.name}.`,
-        variant: 'default',
-      });
-      
-      if (foundUser.email === 'admin@gmail.com') {
-        window.location.href = '/admin/dashboard';
-      } else {
-        window.location.href = '/user/dashboard';
-      }
-      
-      onClose();
-      form.reset();
+    // Determine if the user is admin based on email
+    const isAdmin = data.email.toLowerCase().includes('admin');
+    const userRole = isAdmin ? 'admin' : 'user';
+    
+    // Simulate login success
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userName', data.email.split('@')[0]);
+    localStorage.setItem('userRole', userRole);
+    
+    toast({
+      title: 'Login Berhasil!',
+      description: 'Anda berhasil masuk ke akun Anda.',
+      variant: 'default',
+    });
+    
+    // Trigger storage event for other tabs
+    window.dispatchEvent(new Event('storage'));
+    
+    onClose();
+    form.reset();
+    
+    // Redirect based on user role to the appropriate layout
+    if (isAdmin) {
+      router.push('/admin/dashboard'); // This will be handled by admin/layout.jsx
     } else {
-      toast({
-        title: 'Login Gagal',
-        description: 'Email atau password yang Anda masukkan salah.',
-        variant: 'destructive',
-      });
+      router.push('/user/dashboard'); // This will be handled by user/layout.jsx
     }
   }
 
@@ -68,15 +66,14 @@ export function LoginDialog({ isOpen, onClose }) {
         </button>
         
         <DialogHeader>
-          <DialogTitle className="text-center text-2xl font-bold">Login Akun</DialogTitle>
+          <DialogTitle className="text-center text-2xl font-bold">Login</DialogTitle>
           <DialogDescription className="text-center">
-            Masukkan email dan password Anda untuk melanjutkan.
+            Masukkan email dan password untuk melanjutkan.
           </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Email field */}
             <FormField
               control={form.control}
               name="email"
@@ -94,7 +91,6 @@ export function LoginDialog({ isOpen, onClose }) {
               )}
             />
 
-            {/* Password field */}
             <FormField
               control={form.control}
               name="password"
@@ -117,6 +113,18 @@ export function LoginDialog({ isOpen, onClose }) {
             </Button>
           </form>
         </Form>
+        
+        <div className="mt-4 text-center text-sm">
+          <p className="text-muted-foreground">
+            Belum memiliki akun?{' '}
+            <button 
+              onClick={onRegisterClick}
+              className="text-primary font-medium hover:underline"
+            >
+              Silahkan register
+            </button>
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -17,6 +17,7 @@ import {
   User
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useLogoutHandler } from "@/components/auth/LogoutDialog";
 
 const sidebarLinks = [
   { title: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
@@ -33,6 +34,7 @@ export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [activeLink, setActiveLink] = useState(pathname);
+  const { handleLogout: logoutWithAnimation } = useLogoutHandler();
 
   useEffect(() => {
     setActiveLink(pathname);
@@ -44,12 +46,14 @@ export default function AdminLayout({ children }) {
   };
 
   const handleLogout = () => {
-    // Clear any stored session/tokens
+    // First clear admin-specific session data
     localStorage.removeItem('adminSession');
     sessionStorage.removeItem('adminSession');
     
-    // Redirect to home page
-    window.location.href = '/';
+    // Then use the existing logout handler for animation and general logout
+    logoutWithAnimation();
+    
+    // No need to redirect here as the logoutWithAnimation already does this
   };
 
   return (

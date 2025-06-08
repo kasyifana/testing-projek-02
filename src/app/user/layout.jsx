@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DUMMY_USER } from './profile/page';
+import { useLogoutHandler } from "@/components/auth/LogoutDialog";
 
 export default function UserLayout({ children }) {
   const pathname = usePathname();
@@ -16,6 +17,7 @@ export default function UserLayout({ children }) {
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { handleLogout } = useLogoutHandler();
 
   // Check if we're in a mobile viewport
   useEffect(() => {
@@ -226,6 +228,16 @@ export default function UserLayout({ children }) {
     </header>
   );
   
+  // Handle user logout with animation
+  const onUserLogout = () => {
+    // Clear any user-specific data if needed
+    localStorage.removeItem('userSession');
+    sessionStorage.removeItem('userSession');
+    
+    // Use the shared logout handler that displays the animation
+    handleLogout();
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Mobile sidebar overlay */}
@@ -283,7 +295,7 @@ export default function UserLayout({ children }) {
         
         <div className="p-4 border-t">
           <button
-            onClick={() => window.location.href = '/'}
+            onClick={onUserLogout}
             className="flex items-center w-full px-6 py-3 text-base text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
             <LogOut className="h-5 w-5 mr-3" />
