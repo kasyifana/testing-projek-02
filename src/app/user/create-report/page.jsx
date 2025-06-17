@@ -25,8 +25,7 @@ const priorities = [
 
 export default function CreateReport() {
 	const [isAnonymous, setIsAnonymous] = useState(false);
-
-	// Add global styles to prevent hover effects
+	// Add global styles to prevent hover effects, but exclude sidebar navigation
 	useEffect(() => {
 		const style = document.createElement('style');
 		style.innerHTML = `
@@ -35,6 +34,14 @@ export default function CreateReport() {
       .no-hover-effect *:hover {
         scale: none !important;
         box-shadow: inherit !important;
+      }
+      
+      /* Ensure sidebar icons remain visible */
+      .icon-container, 
+      .icon-container * {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
       }
     `;
 		document.head.appendChild(style);

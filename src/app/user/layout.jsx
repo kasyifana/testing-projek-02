@@ -53,9 +53,7 @@ export default function UserLayout({ children }) {
       { icon: HelpCircle, label: 'Bantuan', path: '/user/help' },
       { icon: Star, label: 'Review', path: '/user/review' },
     ],
-  };
-
-  const NavLink = ({ item }) => (
+  };  const NavLink = ({ item }) => (
     <Link
       href={item.path}
       className={`flex items-center px-6 py-3 text-base transition-colors ${
@@ -64,7 +62,25 @@ export default function UserLayout({ children }) {
           : 'text-gray-600 hover:bg-gray-100 hover:rounded-lg hover:mx-3 hover:text-primary'
       }`}
     >
-      <item.icon className={`h-5 w-5 mr-3 ${pathname === item.path ? 'text-primary' : ''}`} />
+      {/* Force icon to be visible and properly colored regardless of page styles */}
+      <div className="icon-container !visible !block" style={{
+        display: 'flex', 
+        alignItems: 'center',
+        visibility: 'visible',
+        opacity: '1',
+        pointerEvents: 'auto'
+      }}>
+        <item.icon 
+          className={`h-5 w-5 mr-3 !visible !block ${pathname === item.path ? 'text-primary' : ''}`} 
+          style={{
+            color: pathname === item.path ? 'var(--primary)' : 'currentColor',
+            display: 'block',
+            visibility: 'visible',
+            opacity: '1',
+            pointerEvents: 'auto'
+          }} 
+        />
+      </div>
       <span>{item.label}</span>
     </Link>
   );

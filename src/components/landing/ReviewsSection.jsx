@@ -5,10 +5,10 @@ import { Quote, Star, Users } from 'lucide-react';
 
 const reviews = [
   {
-    name: 'Budi Santoso',
-    initials: 'BS',
+    name: 'Haryo Satrio',
+    initials: 'HS',
     avatarUrl: 'https://picsum.photos/id/1005/100/100',
-    role: 'Mahasiswa Teknik Informatika',
+    role: 'Mahasiswa Kimia Murni',
     text: 'Lapor Kampus sangat membantu! Masalah fasilitas di lab komputer cepat ditanggapi setelah saya laporkan melalui platform ini. Prosesnya juga mudah.',
     rating: 5,
   },
