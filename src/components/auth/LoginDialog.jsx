@@ -29,17 +29,17 @@ export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
 
   async function onSubmit(data) {
     setLoginError('');
-    try {
-      const response = await fetch('http://localhost/testing-projek-02-master/src/php/auth/login.php', {
+    try {      const response = await fetch('http://localhost/testing-projek-02-master/src/php/auth/login.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: data.email, password: data.password }),
+        credentials: 'same-origin',
       });
       const result = await response.json();
-      if (result.success) {
-        localStorage.setItem('isLoggedIn', 'true');
+      if (result.success) {        localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('userName', result.user.full_name || result.user.email.split('@')[0]);
         localStorage.setItem('userRole', result.user.role);
+        localStorage.setItem('userEmail', result.user.email); // Store email for session identification
         toast({
           title: 'Login Berhasil!',
           description: 'Anda berhasil masuk ke akun Anda.',

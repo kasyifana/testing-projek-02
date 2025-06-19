@@ -1,14 +1,6 @@
 <?php
-// Enable CORS to allow requests from frontend
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+// Set content-type header
 header("Content-Type: application/json; charset=UTF-8");
-
-// If it's a preflight OPTIONS request, return only the headers and exit
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
-}
 
 // Include the database connection file
 require_once "connection.php";

@@ -2,13 +2,12 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Home, FileText, History, Bell, User, Book, HelpCircle, Star, LogOut, X, UserCircle, Trash, Menu } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DUMMY_USER } from './profile/page';
 import { useLogoutHandler } from "@/components/auth/LogoutDialog";
 
 export default function UserLayout({ children }) {
@@ -18,20 +17,68 @@ export default function UserLayout({ children }) {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { handleLogout } = useLogoutHandler();
+  const [user, setUser] = useState(null);
+  const notificationRef = useRef(null);
+
+  // Mock notifications data (bisa diganti dengan data dari API nanti)
+  const notifications = [
+    { id: 1, title: "Laporan Anda telah diproses", time: "5 menit yang lalu", read: false },
+    { id: 2, title: "Tanggapan baru pada laporan Anda", time: "1 jam yang lalu", read: false },
+    { id: 3, title: "Status laporan Anda telah diubah", time: "1 hari yang lalu", read: true },
+  ];
+
+  // Close notification when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };  }, []);
+    // Fetch user data  
+  useEffect(() => {
+    // Get user email from localStorage (fallback mechanism)
+    const userEmail = localStorage.getItem('userEmail');
+    const url = userEmail 
+      ? `http://localhost/testing-projek-02-master/src/php/user_profile.php?email=${encodeURIComponent(userEmail)}`
+      : 'http://localhost/testing-projek-02-master/src/php/user_profile.php';
+    
+    fetch(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json'
+      }
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Network response was not ok');
+      return res.json();
+    })    .then(data => {
+      if (data.success) {
+        setUser(data.user);
+      } else if (data.message === "User belum login") {
+        // User is not logged in, don't show as error
+        console.log('Session info: User not logged in');
+        // Optionally redirect to login page if needed
+        // window.location.href = '/login';
+      } else {
+        console.error('Error:', data.message);
+      }
+    })
+    .catch(err => console.error('Failed to fetch user:', err));
+  }, []);
 
   // Check if we're in a mobile viewport
   useEffect(() => {
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth < 1024);
     };
-    
-    // Initial check
     checkIfMobile();
-    
-    // Add event listener
     window.addEventListener('resize', checkIfMobile);
-    
-    // Cleanup
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
 
@@ -85,13 +132,6 @@ export default function UserLayout({ children }) {
     </Link>
   );
 
-  // Mock notifications data (replace with real data in production)
-  const notifications = [
-    { id: 1, title: "Laporan Anda telah diproses", time: "5 menit yang lalu", read: false },
-    { id: 2, title: "Tanggapan baru pada laporan Anda", time: "1 jam yang lalu", read: false },
-    { id: 3, title: "Status laporan Anda telah diubah", time: "1 hari yang lalu", read: true },
-  ];
-
   // Profile Popup Component
   const ProfilePopup = () => {
     const handleOutsideClick = (e) => {
@@ -99,6 +139,10 @@ export default function UserLayout({ children }) {
         setShowProfilePopup(false);
       }
     };
+
+    if (!user) {
+      return null; // Don't show popup if no user data
+    }
 
     return (
       <div 
@@ -120,29 +164,34 @@ export default function UserLayout({ children }) {
             <div className="flex items-center gap-4 pb-6 border-b">
               <UserCircle className="w-20 h-20 text-gray-400" />
               <div>
-                <h2 className="text-xl font-semibold">{DUMMY_USER.username}</h2>
-                <p className="text-gray-500">ID: {DUMMY_USER.id}</p>
-                <p className="text-gray-500">Bergabung sejak {DUMMY_USER.joinDate}</p>
+                <h2 className="text-xl font-semibold">{user.full_name}</h2>
+                <p className="text-gray-500">ID: {user.id}</p>
+                <p className="text-gray-500">Email: {user.email}</p>
               </div>
             </div>
 
             <div className="space-y-4">
               <div>
                 <Label>Nama Lengkap</Label>
-                <Input defaultValue={DUMMY_USER.name} />
+                <Input value={user.full_name} readOnly />
               </div>
               
               <div>
                 <Label>Email</Label>
-                <Input defaultValue={DUMMY_USER.email} type="email" />
+                <Input value={user.email} type="email" readOnly />
               </div>
               
               <div>
-                <Label>Nomor Telepon</Label>
-                <Input defaultValue={DUMMY_USER.phone} />
+                <Label>Role</Label>
+                <Input value={user.role} readOnly />
               </div>
 
-              <Button className="w-full">Simpan Perubahan</Button>
+              {user.program_studi_code && (
+                <div>
+                  <Label>Program Studi</Label>
+                  <Input value={user.program_studi_code} readOnly />
+                </div>
+              )}
             </div>
 
             <div className="pt-6 border-t">
@@ -169,7 +218,7 @@ export default function UserLayout({ children }) {
         </button>
       )}
       <div className="flex items-center space-x-4 ml-auto">
-        <div className="relative">
+        <div className="relative" ref={notificationRef}>
           <button 
             onClick={() => setShowNotifications(!showNotifications)}
             className={`p-2 rounded-full ${showNotifications ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
@@ -202,6 +251,10 @@ export default function UserLayout({ children }) {
                       <div 
                         key={notification.id} 
                         className={`p-4 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}
+                        onClick={() => {
+                          // Handle click notification
+                          setShowNotifications(false);
+                        }}
                       >
                         <p className="text-sm font-medium text-gray-800">{notification.title}</p>
                         <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
@@ -236,8 +289,8 @@ export default function UserLayout({ children }) {
             <User className="h-5 w-5 text-white" />
           </div>
           <div className="hidden md:block text-left">
-            <p className="font-medium text-gray-700 leading-tight">{DUMMY_USER.username}</p>
-            <p className="text-xs text-gray-500">{DUMMY_USER.id}</p>
+            <p className="font-medium text-gray-700 leading-tight">{user?.full_name || '-'}</p>
+            <p className="text-xs text-gray-500">{user?.email || '-'}</p>
           </div>
         </button>
       </div>
