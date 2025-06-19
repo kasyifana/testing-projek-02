@@ -1,0 +1,38 @@
+# Enable PHP execution
+AddType application/x-httpd-php .php
+
+# Set default charset to UTF-8
+AddDefaultCharset UTF-8
+
+# Enable RewriteEngine
+RewriteEngine On
+
+# Handle CORS preflight requests
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+# Prevent direct access to certain files and directories
+<FilesMatch "^(connection\.php)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Fix for 500 errors in some configurations
+<IfModule mod_php7.c>
+    php_value output_buffering Off
+    php_value default_charset UTF-8
+    php_value max_execution_time 300
+</IfModule>
+
+# Redirect all API requests to the appropriate PHP files
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/program-study$ program_study.php [L]
+RewriteRule ^api/register$ register.php [L]
+
+# Enable displaying of errors during development
+php_flag display_errors on
+php_value error_reporting 2047

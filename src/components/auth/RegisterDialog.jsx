@@ -15,105 +15,9 @@ import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Lottie from 'lottie-react';
+import { useRouter } from 'next/navigation';
 
-// Program study options grouped by category
-const programStudyOptions = [
-	{
-		category: "PROGRAM STUDI DIPLOMA (D3)",
-		items: [
-			{ value: "d3_analisis_kimia", label: "Ahli Madya (D3) Analisis Kimia" }
-		]
-	},
-	{
-		category: "PROGRAM STUDI SARJANA TERAPAN",
-		items: [
-			{ value: "st_akuntansi_perpajakan", label: "Sarjana Terapan Akuntansi Perpajakan" },
-			{ value: "st_analisis_keuangan", label: "Sarjana Terapan Analisis Keuangan" },
-			{ value: "st_bisnis_digital", label: "Sarjana Terapan Bisnis Digital" },
-		]
-	},
-	{
-		category: "PROGRAM STUDI SARJANA (S1)",
-		items: [
-			{ value: "s1_akuntansi", label: "Sarjana Akuntansi" },
-			{ value: "s1_arsitektur", label: "Sarjana Arsitektur" },
-			{ value: "s1_ekonomi_islam", label: "Sarjana Ekonomi (Ekonomi Islam)" },
-			{ value: "s1_ekonomi_pembangunan", label: "Sarjana Ekonomi (Ekonomi Pembangunan)" },
-			{ value: "s1_farmasi", label: "Sarjana Farmasi" },
-			{ value: "s1_hubungan_internasional", label: "Sarjana Hubungan Internasional" },
-			{ value: "s1_hukum_keluarga", label: "Sarjana Hukum (Hukum Keluarga/Ahwal Syakhshiyah)" },
-			{ value: "s1_hukum", label: "Sarjana Hukum" },
-			{ value: "s1_hukum_bisnis", label: "Sarjana Hukum Bisnis" },
-			{ value: "s1_ilmu_komunikasi", label: "Sarjana Ilmu Komunikasi" },
-			{ value: "s1_kedokteran", label: "Sarjana Kedokteran" },
-			{ value: "s1_informatika", label: "Sarjana Komputer (Informatika)" },
-			{ value: "s1_manajemen", label: "Sarjana Manajemen" },
-			{ value: "s1_pendidikan_agama_islam", label: "Sarjana Pendidikan (Pendidikan Agama Islam)" },
-			{ value: "s1_pendidikan_bahasa_inggris", label: "Sarjana Pendidikan (Pendidikan Bahasa Inggris)" },
-			{ value: "s1_pendidikan_kimia", label: "Sarjana Pendidikan (Pendidikan Kimia)" },
-			{ value: "s1_psikologi", label: "Sarjana Psikologi" },
-			{ value: "s1_kimia", label: "Sarjana Sains (Kimia)" },
-			{ value: "s1_statistika", label: "Sarjana Statistika" },
-			{ value: "s1_rekayasa_tekstil", label: "Sarjana Teknik (Rekayasa Tekstil)" },
-			{ value: "s1_manajemen_rekayasa", label: "Sarjana Teknik (Manajemen Rekayasa)" },
-			{ value: "s1_teknik_elektro", label: "Sarjana Teknik (Teknik Elektro)" },
-			{ value: "s1_teknik_industri", label: "Sarjana Teknik (Teknik Industri)" },
-			{ value: "s1_teknik_kimia", label: "Sarjana Teknik (Teknik Kimia)" },
-			{ value: "s1_teknik_lingkungan", label: "Sarjana Teknik (Teknik Lingkungan)" },
-			{ value: "s1_teknik_mesin", label: "Sarjana Teknik (Teknik Mesin)" },
-			{ value: "s1_teknik_sipil", label: "Sarjana Teknik (Teknik Sipil)" },
-		]
-	},
-	{
-		category: "PROGRAM STUDI MAGISTER (S2)",
-		items: [
-			{ value: "s2_akuntansi", label: "Magister Akuntansi" },
-			{ value: "s2_arsitektur", label: "Magister Arsitektur" },
-			{ value: "s2_farmasi", label: "Magister Farmasi" },
-			{ value: "s2_hukum", label: "Magister Hukum" },
-			{ value: "s2_kenotariatan", label: "Magister Kenotariatan" },
-			{ value: "s2_manajemen", label: "Magister Manajemen" },
-			{ value: "s2_ilmu_agama_islam", label: "Magister Ilmu Agama Islam" },
-			{ value: "s2_ilmu_ekonomi", label: "Magister Ilmu Ekonomi" },
-			{ value: "s2_statistika", label: "Magister Statistika" },
-			{ value: "s2_kesehatan_masyarakat", label: "Magister Kesehatan Masyarakat" },
-			{ value: "s2_informatika", label: "Magister Komputer (Informatika)" },
-			{ value: "s2_rekayasa_elektro", label: "Magister Teknik (Rekayasa Elektro)" },
-			{ value: "s2_teknik_industri", label: "Magister Teknik (Teknik Industri)" },
-			{ value: "s2_teknik_kimia", label: "Magister Teknik (Teknik Kimia)" },
-			{ value: "s2_teknik_lingkungan", label: "Magister Teknik (Teknik Lingkungan)" },
-			{ value: "s2_teknik_sipil", label: "Magister Teknik (Teknik Sipil)" },
-			{ value: "s2_kimia", label: "Magister Sains (Kimia)" },
-			{ value: "s2_psikologi", label: "Magister Psikologi" },
-			{ value: "s2_ilmu_komunikasi", label: "Magister Ilmu Komunikasi" },
-		]
-	},
-	{
-		category: "PROGRAM STUDI DOKTOR (S3)",
-		items: [
-			{ value: "s3_hukum", label: "Doktor Hukum" },
-			{ value: "s3_hukum_islam", label: "Doktor Hukum Islam" },
-			{ value: "s3_ilmu_ekonomi", label: "Doktor Ilmu Ekonomi" },
-			{ value: "s3_manajemen", label: "Doktor Manajemen" },
-			{ value: "s3_teknik_sipil", label: "Doktor Teknik Sipil" },
-			{ value: "s3_rekayasa_industri", label: "Doktor Rekayasa Industri" },
-		]
-	},
-	{
-		category: "PROGRAM PROFESI",
-		items: [
-			{ value: "prof_arsitek", label: "Program Profesi Arsitek" },
-			{ value: "prof_dokter", label: "Program Profesi Dokter" },
-			{ value: "prof_apoteker", label: "Pendidikan Profesi Apoteker" },
-			{ value: "prof_psikologi", label: "Pendidikan Profesi Psikologi" },
-		]
-	},
-];
-
-// Flatten the options for easier search
-const flatProgramStudyOptions = programStudyOptions.flatMap(group => 
-	group.items.map(item => ({ value: item.value, label: item.label }))
-);
+// Empty initialization - will be populated from database
 
 const registerSchema = z.object({
 	name: z.string().min(2, { message: 'Nama minimal 2 karakter.' }),
@@ -136,10 +40,13 @@ const registerSchema = z.object({
 );
 
 export function RegisterDialog({ isOpen, onClose }) {
+	const router = useRouter();
 	const { toast } = useToast();
 	const [open, setOpen] = useState(false);
 	const [successAnimation, setSuccessAnimation] = useState(null);
-	
+	const [programStudyOptions, setProgramStudyOptions] = useState([]);
+	const [flatProgramStudyOptions, setFlatProgramStudyOptions] = useState([]);
+	const [isLoadingPrograms, setIsLoadingPrograms] = useState(false);
 	useEffect(() => {
 		// Use exactly the same animation URL as LogoutDialog
 		fetch('https://assets5.lottiefiles.com/private_files/lf30_ulp9xiqw.json')
@@ -150,7 +57,48 @@ export function RegisterDialog({ isOpen, onClose }) {
 			.catch(error => {
 				console.error("Failed to load animation:", error);
 			});
-	}, []);
+					// Fetch program study options from PHP API
+		setIsLoadingPrograms(true);
+		fetch('http://localhost/testing-projek-02-master/src/php/program_study.php')
+			.then(response => {
+				if (!response.ok) {
+					throw new Error('Network response was not ok');
+				}
+				return response.json();
+			})			.then(data => {
+				console.log("Fetched program study data:", data);
+				// Handle both normal response and debug response
+				const programData = data.data ? data.data : data;
+				
+				// If there's an error property, it means there was an error
+				if (data.error) {
+					console.error("Error from API:", data.error);
+					throw new Error(data.error);
+				}
+				
+				setProgramStudyOptions(programData);
+				// Flatten the options for easier search
+				const flatOptions = programData.flatMap(group => 
+					group.items.map(item => ({ value: item.value, label: item.label }))
+				);
+				setFlatProgramStudyOptions(flatOptions);
+			})
+			.catch(error => {
+				console.error("Failed to load program study data:", error);
+				// Fallback empty structure in case of error
+				setProgramStudyOptions([]);
+				setFlatProgramStudyOptions([]);
+				// Show toast with error
+				toast({
+					title: "Error",
+					description: "Failed to load program study data. Please try again later.",
+					variant: "destructive"
+				});
+			})
+			.finally(() => {
+				setIsLoadingPrograms(false);
+			});
+	}, [toast]);
 	
 	const form = useForm({
 		resolver: zodResolver(registerSchema),
@@ -165,38 +113,76 @@ export function RegisterDialog({ isOpen, onClose }) {
 	});
 
 	const watchRole = form.watch('role');
-
 	function onSubmit(data) {
 		console.log("Form submitted with data:", data);
-		
-		// Make toast exactly like in LogoutDialog
-		toast({
-			title: 'Registrasi Berhasil!',
-			description: `Akun untuk ${data.name} telah berhasil dibuat. Silahkan login untuk melanjutkan.`,
-			action: successAnimation ? (
-				<div className="w-20 h-20 mx-auto">
-					<Lottie
-						animationData={successAnimation}
-						loop={true}
-						autoplay={true}
-					/>
-				</div>
-			) : (
-				<div className="w-20 h-20 mx-auto flex items-center justify-center">
-					<UserPlus className="h-10 w-10 text-green-500" />
-				</div>
-			),
-		}); // No custom classes, duration, or variant - exactly like LogoutDialog
-		
-		// Store login info
-		localStorage.setItem('isLoggedIn', 'true');
-		localStorage.setItem('userName', data.name);
-		
-		// Add a small delay before closing the dialog
-		setTimeout(() => {
-			onClose();
-			form.reset();
-		}, 1500);
+				// Send registration data to PHP endpoint
+		fetch('http://localhost/testing-projek-02-master/src/php/register.php', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(data),
+		})
+		.then(response => {
+			if (!response.ok) {
+				throw new Error('Network response was not ok');
+			}
+			return response.json();
+		})
+		.then(result => {
+			if (result.success) {
+				// Make toast exactly like in LogoutDialog
+				toast({
+					title: 'Registrasi Berhasil!',
+					description: `Akun untuk ${data.name} telah berhasil dibuat. Silahkan login untuk melanjutkan.`,
+					action: successAnimation ? (
+						<div className="w-20 h-20 mx-auto">
+							<Lottie
+								animationData={successAnimation}
+								loop={true}
+								autoplay={true}
+							/>
+						</div>
+					) : (
+						<div className="w-20 h-20 mx-auto flex items-center justify-center">
+							<UserPlus className="h-10 w-10 text-green-500" />
+						</div>
+					),
+				}); // No custom classes, duration, or variant - exactly like LogoutDialog
+				
+				// Store login info
+				localStorage.setItem('isLoggedIn', 'true');
+				localStorage.setItem('userName', data.name);
+				
+				// Add a small delay before closing the dialog
+				setTimeout(() => {
+					onClose();
+					form.reset();
+				}, 1500);
+				
+				// Redirect to home after successful registration
+				setTimeout(() => {
+					localStorage.removeItem('isLoggedIn');
+					localStorage.removeItem('userName');
+					router.push('/');
+				}, 1500); // Delay for toast/animation
+			} else {
+				// Show backend error message if available
+				toast({
+					title: 'Registration Failed',
+					description: result.message || 'An error occurred during registration. Please try again.',
+					variant: 'destructive',
+				});
+			}
+		})
+		.catch(error => {
+			console.error('Error during registration:', error);
+			toast({
+				title: 'Registration Failed',
+				description: 'An error occurred during registration. Please try again.',
+				variant: 'destructive',
+			});
+		});
 	}
 
 	return (
@@ -352,41 +338,50 @@ export function RegisterDialog({ isOpen, onClose }) {
 																	});
 																}}
 															/>
-														</div>
-
-														{/* Program list with max height and scrollable */}
+														</div>												{/* Program list with max height and scrollable */}
 														<div className="max-h-[240px] overflow-y-auto p-1">
-															{programStudyOptions.map((group) => (
-																<div key={group.category} className="program-group">
-																	<div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-																		{group.category}
-																	</div>
-																	{group.items.map((option) => (
-																		<div
-																			key={option.value}
-																			className={`
-																				program-item flex items-center rounded-sm px-2 py-2 text-sm cursor-pointer
-																				${option.value === field.value ? 'bg-accent text-accent-foreground' : 'hover:bg-accent hover:text-accent-foreground'}
-																			`}
-																			onClick={() => {
-																				form.setValue("programStudy", option.value, { shouldValidate: true });
-																				console.log("Selected program:", option.value);
-																				setOpen(false);
-																			}}
-																		>
-																			<Check
-																				className={cn(
-																					"mr-2 h-4 w-4",
-																					option.value === field.value
-																						? "opacity-100"
-																						: "opacity-0"
-																				)}
-																			/>
-																			<span>{option.label}</span>
-																		</div>
-																	))}
+															{isLoadingPrograms ? (
+																<div className="flex justify-center items-center p-4">
+																	<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+																	<span className="ml-2">Loading...</span>
 																</div>
-															))}
+															) : programStudyOptions.length === 0 ? (
+																<div className="text-center py-4 text-muted-foreground">
+																	No program studies available
+																</div>
+															) : (
+																programStudyOptions.map((group) => (
+																	<div key={group.category} className="program-group">
+																		<div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+																			{group.category}
+																		</div>
+																		{group.items.map((option) => (
+																			<div
+																				key={option.value}
+																				className={`
+																					program-item flex items-center rounded-sm px-2 py-2 text-sm cursor-pointer
+																					${option.value === field.value ? 'bg-accent text-accent-foreground' : 'hover:bg-accent hover:text-accent-foreground'}
+																				`}
+																				onClick={() => {
+																					form.setValue("programStudy", option.value, { shouldValidate: true });
+																					console.log("Selected program:", option.value);
+																					setOpen(false);
+																				}}
+																			>
+																				<Check
+																					className={cn(
+																						"mr-2 h-4 w-4",
+																						option.value === field.value
+																							? "opacity-100"
+																							: "opacity-0"
+																					)}
+																				/>
+																				<span>{option.label}</span>
+																			</div>
+																		))}
+																	</div>
+																))
+															)}
 														</div>
 													</div>
 												)}

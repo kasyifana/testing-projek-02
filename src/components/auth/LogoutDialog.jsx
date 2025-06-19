@@ -24,7 +24,9 @@ export function useLogoutHandler() {
       });
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Hapus session di server
+    await fetch('/testing-projek-02-master/src/php/auth/logout.php', { method: 'POST', credentials: 'include' });
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('userName');

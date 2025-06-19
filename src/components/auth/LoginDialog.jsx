@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Mail, Lock, LogIn, X } from 'lucide-react';
+import React, { useState } from 'react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Format email tidak valid.' }),
@@ -23,35 +24,67 @@ export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
+  const [shake, setShake] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
-  function onSubmit(data) {
-    // Determine if the user is admin based on email
-    const isAdmin = data.email.toLowerCase().includes('admin');
-    const userRole = isAdmin ? 'admin' : 'user';
-    
-    // Simulate login success
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('userName', data.email.split('@')[0]);
-    localStorage.setItem('userRole', userRole);
-    
-    toast({
-      title: 'Login Berhasil!',
-      description: 'Anda berhasil masuk ke akun Anda.',
-      variant: 'default',
-    });
-    
-    // Trigger storage event for other tabs
-    window.dispatchEvent(new Event('storage'));
-    
-    onClose();
-    form.reset();
-    
-    // Redirect based on user role to the appropriate layout
-    if (isAdmin) {
-      router.push('/admin/dashboard'); // This will be handled by admin/layout.jsx
-    } else {
-      router.push('/user/dashboard'); // This will be handled by user/layout.jsx
+  async function onSubmit(data) {
+    setLoginError('');
+    try {
+      const response = await fetch('http://localhost/testing-projek-02-master/src/php/auth/login.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email, password: data.password }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userName', result.user.full_name || result.user.email.split('@')[0]);
+        localStorage.setItem('userRole', result.user.role);
+        toast({
+          title: 'Login Berhasil!',
+          description: 'Anda berhasil masuk ke akun Anda.',
+          variant: 'default',
+        });
+        window.dispatchEvent(new Event('storage'));
+        onClose();
+        form.reset();
+        if (result.user.role === 'admin') {
+          router.push('/admin/dashboard');
+        } else {
+          router.push('/user/dashboard');
+        }
+      } else {
+        setShake(true);
+        setTimeout(() => setShake(false), 600); // Reset shake after animation
+        let errorMsg = 'Email atau password salah.';
+        if (result.error === 'not_found') {
+          errorMsg = 'Email atau password tidak ditemukan.';
+        }
+        setLoginError(errorMsg);
+        toast({
+          title: 'Login Gagal',
+          description: errorMsg,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      setShake(true);
+      setTimeout(() => setShake(false), 600);
+      setLoginError('Tidak dapat terhubung ke server.');
+      toast({
+        title: 'Terjadi Kesalahan',
+        description: 'Tidak dapat terhubung ke server.',
+        variant: 'destructive',
+      });
     }
+  }
+
+  // Reset loginError saat user mengetik ulang
+  function handleInputChange(field) {
+    return (e) => {
+      form.setValue(field, e.target.value);
+      setLoginError('');
+    };
   }
 
   return (
@@ -83,7 +116,7 @@ export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
                   <FormControl>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input type="email" placeholder="contoh@email.com" {...field} className="pl-10" />
+                      <Input type="email" placeholder="contoh@email.com" {...field} onChange={handleInputChange('email')} className={`pl-10 ${shake ? 'animate-shake border-red-500' : ''}`} />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -100,10 +133,13 @@ export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
                   <FormControl>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input type="password" placeholder="••••••••" {...field} className="pl-10" />
+                      <Input type="password" placeholder="••••••••" {...field} onChange={handleInputChange('password')} className={`pl-10 ${shake ? 'animate-shake border-red-500' : ''}`} />
                     </div>
                   </FormControl>
                   <FormMessage />
+                  {loginError && (
+                    <p className="text-xs text-red-500 mt-1">{loginError}</p>
+                  )}
                 </FormItem>
               )}
             />
@@ -129,3 +165,14 @@ export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
     </Dialog>
   );
 }
+
+// Tambahkan animasi shake di global CSS (misal: src/app/globals.css):
+// .animate-shake {
+//   animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+// }
+// @keyframes shake {
+//   10%, 90% { transform: translateX(-1px); }
+//   20%, 80% { transform: translateX(2px); }
+//   30%, 50%, 70% { transform: translateX(-4px); }
+//   40%, 60% { transform: translateX(4px); }
+// }
