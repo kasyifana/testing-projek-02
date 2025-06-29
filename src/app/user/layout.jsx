@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { Home, FileText, History, Bell, User, Book, HelpCircle, Star, LogOut, X, UserCircle, Trash, Menu } from 'lucide-react';
@@ -9,9 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLogoutHandler } from "@/components/auth/LogoutDialog";
+import { isTokenValid, clearAuthData } from "@/components/auth/LoginDialog";
+import { notFound } from 'next/navigation';
 
 export default function UserLayout({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -19,13 +22,36 @@ export default function UserLayout({ children }) {
   const { handleLogout } = useLogoutHandler();
   const [user, setUser] = useState(null);
   const notificationRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [readNotifications, setReadNotifications] = useState(() => {
+    // Load read notification IDs from localStorage if available
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('readNotifications');
+      return stored ? JSON.parse(stored) : [];
+    }
+    return [];
+  });
 
-  // Mock notifications data (bisa diganti dengan data dari API nanti)
-  const notifications = [
-    { id: 1, title: "Laporan Anda telah diproses", time: "5 menit yang lalu", read: false },
-    { id: 2, title: "Tanggapan baru pada laporan Anda", time: "1 jam yang lalu", read: false },
-    { id: 3, title: "Status laporan Anda telah diubah", time: "1 hari yang lalu", read: true },
-  ];
+  // Save read notifications to localStorage whenever it changes
+  useEffect(() => {
+    if (readNotifications.length > 0) {
+      localStorage.setItem('readNotifications', JSON.stringify(readNotifications));
+    }
+  }, [readNotifications]);
+
+  // Mark a notification as read
+  const markAsRead = (notificationId) => {
+    if (!readNotifications.includes(notificationId)) {
+      const updatedReadNotifications = [...readNotifications, notificationId];
+      setReadNotifications(updatedReadNotifications);
+    }
+  };
+
+  // Check if a notification is read
+  const isNotificationRead = (notificationId) => {
+    return readNotifications.includes(notificationId);
+  };
 
   // Close notification when clicking outside
   useEffect(() => {
@@ -38,39 +64,227 @@ export default function UserLayout({ children }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-    };  }, []);
-    // Fetch user data  
-  useEffect(() => {
-    // Get user email from localStorage (fallback mechanism)
-    const userEmail = localStorage.getItem('userEmail');
-    const url = userEmail 
-      ? `http://localhost/testing-projek-02-master/src/php/user_profile.php?email=${encodeURIComponent(userEmail)}`
-      : 'http://localhost/testing-projek-02-master/src/php/user_profile.php';
-    
-    fetch(url, {
-      method: 'GET',
-      credentials: 'same-origin',
-      headers: {
-        'Accept': 'application/json'
-      }
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Network response was not ok');
-      return res.json();
-    })    .then(data => {
-      if (data.success) {
-        setUser(data.user);
-      } else if (data.message === "User belum login") {
-        // User is not logged in, don't show as error
-        console.log('Session info: User not logged in');
-        // Optionally redirect to login page if needed
-        // window.location.href = '/login';
-      } else {
-        console.error('Error:', data.message);
-      }
-    })
-    .catch(err => console.error('Failed to fetch user:', err));
+    };
   }, []);
+  
+  // Format timestamp similar to the notifications page
+  const formatTimestamp = (dateString) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffSeconds < 60) {
+      return 'Baru saja';
+    } else if (diffSeconds < 3600) {
+      const minutes = Math.floor(diffSeconds / 60);
+      return `${minutes} menit yang lalu`;
+    } else if (diffSeconds < 86400) {
+      const hours = Math.floor(diffSeconds / 3600);
+      return `${hours} jam yang lalu`;
+    } else if (diffSeconds < 604800) {
+      const days = Math.floor(diffSeconds / 86400);
+      return `${days} hari yang lalu`;
+    } else {
+      // Format to Indonesian date format
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return date.toLocaleDateString('id-ID', options);
+    }
+  };
+
+  // Get notification title based on status
+  const getNotificationTitle = (status) => {
+    switch (status) {
+      case 'Diproses':
+        return 'Laporan sedang diproses';
+      case 'Ditanggapi':
+        return 'Tanggapan baru';
+      case 'Selesai':
+        return 'Laporan selesai';
+      case 'Ditolak':
+        return 'Laporan ditolak';
+      default:
+        return 'Status diperbarui';
+    }
+  };
+
+  // Fetch notifications for the user
+  const fetchNotifications = async (userId) => {
+    if (!userId) return;
+    
+    try {
+      setNotificationLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.warn('Token tidak ditemukan untuk fetch notifikasi');
+        return;
+      }
+
+      const apiUrl = `/api/proxy?endpoint=laporan`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error(`Error ${response.status} fetching notifications`);
+        return;
+      }
+
+      // Parse the JSON response
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Failed to parse notification response:', jsonError);
+        return;
+      }
+      
+      // Handle different API response formats
+      let reportData = [];
+      if (Array.isArray(data)) {
+        reportData = data;
+      } else if (data.data && Array.isArray(data.data)) {
+        reportData = data.data;
+      } else if (typeof data === 'object' && data !== null) {
+        const possibleDataFields = Object.keys(data).filter(key => 
+          Array.isArray(data[key]) && data[key].length > 0 && 
+          typeof data[key][0] === 'object'
+        );
+        
+        if (possibleDataFields.length > 0) {
+          reportData = data[possibleDataFields[0]];
+        } else if (data.judul || data.title || data.id) {
+          reportData = [data]; // Single report object
+        }
+      }
+      
+      // Filter reports for the current user
+      const userReports = reportData.filter(report => {
+        if (!report || typeof report !== 'object') return false;
+        const reportUserId = report.user_id || report.userId || report.pengguna_id;
+        return String(reportUserId) === String(userId);
+      });
+      
+      // Generate notifications from reports
+      const notifs = userReports
+        .filter(report => report.status !== 'Pending') // Only reports with non-pending status
+        .map((report, index) => {
+          const title = getNotificationTitle(report.status);
+          const message = `Laporan "${report.judul}" status: ${report.status}`;
+          const time = report.updated_at || report.tanggal_lapor;
+          
+          return {
+            id: report.id || `notif-${index}-${Date.now()}`,
+            title: title,
+            message: message,
+            time: formatTimestamp(time),
+            read: false, // Default to unread
+            report
+          };
+        });
+      
+      // Sort notifications by time (newest first)
+      notifs.sort((a, b) => {
+        const dateA = a.report.updated_at || a.report.tanggal_lapor;
+        const dateB = b.report.updated_at || b.report.tanggal_lapor;
+        return new Date(dateB) - new Date(dateA); 
+      });
+      
+      // Take only the 5 most recent notifications for the dropdown
+      const recentNotifs = notifs.slice(0, 5);
+      setNotifications(recentNotifs);
+      
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+  
+  // Fetch notifications when user data is available
+  useEffect(() => {
+    if (user && user.id) {
+      fetchNotifications(user.id);
+    }
+  }, [user]);
+
+  // Fetch user data from external API using Bearer token
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        if (!isTokenValid()) {
+          clearAuthData();
+          router.push('/');
+          return;
+        }
+        const token = localStorage.getItem('token');
+        if (!token) {
+          clearAuthData();
+          router.push('/');
+          return;
+        }
+        const response = await fetch('http://127.0.0.1:8000/api/profile', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          mode: 'cors',
+        });        if (!response.ok) {
+          if (response.status === 401) {
+            clearAuthData();
+            router.push('/');
+            return;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }        const data = await response.json();
+        console.log('Profile data received:', data);
+
+        // Handle different response formats
+        if (data.success && data.user) {
+          setUser(data.user);
+        } else if (data.data) {
+          setUser(data.data);
+        } else if (data.user) {
+          setUser(data.user);
+        } else if (data.success && data.data) {
+          setUser(data.data);
+        } else if (data.id) {
+          // Objek user langsung dikembalikan tanpa wrapping
+          setUser({
+            id: data.id,
+            full_name: data.name, // Menyesuaikan name menjadi full_name
+            email: data.email,
+            role: data.is_admin ? 'Admin' : 'User',
+            program_studi_code: data.program_studi_id?.toString() || null
+          });
+        } else {
+          console.error('Invalid profile response format:', data);
+        }
+
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        
+        // Provide more specific error handling
+        if (error.message.includes('fetch')) {
+          console.error('Network error - please check connection and server at http://127.0.0.1:8000');
+        } else if (error.message.includes('401')) {
+          console.error('Authentication failed - token may be expired');
+          clearAuthData();
+        } else if (error.message.includes('CORS')) {
+          console.error('CORS error - please check server configuration');
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, [router]);
 
   // Check if we're in a mobile viewport
   useEffect(() => {
@@ -224,9 +438,9 @@ export default function UserLayout({ children }) {
             className={`p-2 rounded-full ${showNotifications ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
           >
             <Bell className="h-5 w-5 text-gray-600" />
-            {notifications.filter(n => !n.read).length > 0 && (
+            {notifications.filter(n => !isNotificationRead(n.id)).length > 0 && (
               <span className="absolute top-0 right-0 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
-                {notifications.filter(n => !n.read).length}
+                {notifications.filter(n => !isNotificationRead(n.id)).length}
               </span>
             )}
           </button>
@@ -236,27 +450,52 @@ export default function UserLayout({ children }) {
             <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="font-medium">Notifikasi</h3>
-                <button 
-                  onClick={() => setShowNotifications(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Mark all notifications as read
+                        const allIds = notifications.map(n => n.id);
+                        setReadNotifications([...new Set([...readNotifications, ...allIds])]);
+                      }}
+                      className="text-xs text-primary hover:text-primary-dark mr-2"
+                    >
+                      Tandai semua dibaca
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setShowNotifications(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               
               <div className="max-h-80 overflow-y-auto">
-                {notifications.length > 0 ? (
+                {notificationLoading ? (
+                  <div className="flex items-center justify-center p-4">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
+                    <span className="ml-2 text-sm text-gray-500">Memuat...</span>
+                  </div>
+                ) : notifications.length > 0 ? (
                   <div className="divide-y divide-gray-100">
                     {notifications.map(notification => (
                       <div 
                         key={notification.id} 
-                        className={`p-4 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}
+                        className={`p-4 hover:bg-gray-50 cursor-pointer ${!isNotificationRead(notification.id) ? 'bg-blue-50' : ''}`}
                         onClick={() => {
-                          // Handle click notification
+                          // Mark as read when clicked
+                          markAsRead(notification.id);
+                          
+                          // Navigate to history when clicking a notification
+                          router.push('/user/history');
                           setShowNotifications(false);
                         }}
                       >
                         <p className="text-sm font-medium text-gray-800">{notification.title}</p>
+                        <p className="text-xs text-gray-600">{notification.message}</p>
                         <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                       </div>
                     ))}
@@ -296,10 +535,12 @@ export default function UserLayout({ children }) {
       </div>
     </header>
   );
-  
-  // Handle user logout with animation
+    // Handle user logout with animation
   const onUserLogout = () => {
-    // Clear any user-specific data if needed
+    // Clear all authentication data using helper function
+    clearAuthData();
+    
+    // Clear any additional user-specific data if needed
     localStorage.removeItem('userSession');
     sessionStorage.removeItem('userSession');
     

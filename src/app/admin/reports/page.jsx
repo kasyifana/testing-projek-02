@@ -11,7 +11,8 @@ import {
   Clock,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Loader2
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -21,99 +22,346 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-const DUMMY_REPORTS = [
-  {
-    id: 1,
-    title: "Kerusakan AC Ruang 301",
-    category: "Fasilitas",
-    urgency: "High",
-    date: "2024-01-15",
-    status: "new",
-    description: "AC tidak dingin dan mengeluarkan bunyi keras",
-    submittedBy: "Mahasiswa A",
-    submittedAt: "2024-01-15 10:30",
-    estimatedTime: "", // Removed fixed estimation time
-    responses: [
-      {
-        message: "Teknisi sedang melakukan pengecekan. Mohon tunggu update selanjutnya.",
-        timestamp: "2024-01-15 11:00",
-        author: "Admin"
-      }
-    ]
-  },
-  {
-    id: 2,
-    title: "Komplain Nilai UAS",
-    category: "Akademik",
-    urgency: "Medium",
-    date: "2024-01-14",
-    status: "archived",
-    description: "Nilai tidak sesuai dengan hasil ujian",
-    submittedBy: "Mahasiswa B",
-    submittedAt: "2024-01-14 09:15",
-    estimatedTime: "5 hari",
-    responses: []
-  },
-  {
-    id: 3,
-    title: "Kerusakan Proyektor di Ruang 204",
-    category: "Fasilitas",
-    urgency: "High",
-    date: "2024-01-16",
-    status: "new",
-    description: "Proyektor tidak dapat tersambung ke laptop dan gambar yang dihasilkan tidak jelas. Sudah dicoba dengan beberapa laptop berbeda namun masalah tetap sama. Sangat mengganggu proses belajar mengajar.",
-    submittedBy: "Dosen C",
-    submittedAt: "2024-01-16 08:45",
-    estimatedTime: "2 hari",
-    responses: [
-      {
-        message: "Terima kasih atas laporannya. Tim IT akan segera memeriksa kondisi proyektor tersebut hari ini.",
-        timestamp: "2024-01-16 09:30",
-        author: "Admin"
-      },
-      {
-        message: "Update: Proyektor tersebut memerlukan penggantian kabel HDMI dan penyesuaian pengaturan resolusi. Teknisi akan melakukan perbaikan besok pagi.",
-        timestamp: "2024-01-16 14:15",
-        author: "Tim IT"
-      }
-    ]
-  },
-  {
-    id: 4,
-    title: "Kebocoran Atap Perpustakaan",
-    category: "Fasilitas",
-    urgency: "Medium",
-    date: "2024-01-13",
-    status: "inProgress",
-    description: "Terdapat kebocoran pada atap perpustakaan di bagian sudut timur. Saat hujan, air menetes dan bisa merusak buku-buku yang ada di bawahnya.",
-    submittedBy: "Staf Perpustakaan",
-    submittedAt: "2024-01-13 11:20",
-    estimatedTime: "7 hari",
-    responses: [
-      {
-        message: "Tim pemeliharaan akan melakukan pengecekan hari ini.",
-        timestamp: "2024-01-13 13:00",
-        author: "Admin"
-      },
-      {
-        message: "Perbaikan telah dilakukan dengan menambal bagian yang bocor. Untuk sementara masalah sudah teratasi, namun perlu perbaikan lebih lanjut saat musim hujan berakhir.",
-        timestamp: "2024-01-14 16:45",
-        author: "Tim Pemeliharaan"
-      },
-      {
-        message: "Perbaikan permanen telah selesai dilakukan. Mohon informasikan jika masih terdapat masalah.",
-        timestamp: "2024-01-17 10:30",
-        author: "Tim Pemeliharaan"
-      }
-    ]
+// Format date to locale string
+const formatDate = (dateString) => {
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString('id-ID', options);
+};
+
+// Format date and time to locale string
+const formatDateTime = (dateString, timeString) => {
+  if (!dateString) return '';
+  
+  let date;
+  if (typeof dateString === 'string' && timeString) {
+    // If we have separate date and time strings
+    date = new Date(`${dateString}T${timeString}`);
+  } else if (dateString instanceof Date) {
+    date = dateString;
+  } else {
+    date = new Date(dateString);
   }
-];
+  
+  const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  return date.toLocaleDateString('id-ID', options);
+};
+
+// Map backend status to frontend status
+const mapStatus = (backendStatus) => {
+  switch (backendStatus) {
+    case 'Pending':
+      return 'new';
+    case 'In Progress':
+      return 'inProgress';
+    case 'Selesai':
+      return 'archived';
+    default:
+      return 'new';
+  }
+};
+
+// Map frontend status to backend status
+const mapStatusToBackend = (frontendStatus) => {
+  switch (frontendStatus) {
+    case 'new':
+      return 'Pending';
+    case 'inProgress':
+      return 'In Progress';
+    case 'archived':
+      return 'Selesai';
+    default:
+      return 'Pending';
+  }
+};
+
+// Helper function for making API requests with fallbacks, including PUT/POST methods
+const updateReportRequest = async (reportId, payload) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error("Token tidak ditemukan. Silakan login terlebih dahulu.");
+  }
+
+  const body = JSON.stringify(payload);
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
+  const directHeaders = { ...headers, 'Origin': window.location.origin };
+
+  const proxyApiUrl = `/api/proxy?endpoint=laporan/${reportId}`;
+  const directApiUrl = `http://127.0.0.1:8000/api/laporan/${reportId}`;
+
+  let lastResponse;
+
+  // This function tries PUT, and if it gets a 405, it tries POST.
+  const tryRequestMethods = async (url, options) => {
+    let response = await fetch(url, { ...options, method: 'PUT' });
+    if (response.status === 405) { // Method Not Allowed
+      console.warn(`PUT not allowed for ${url}, trying POST...`);
+      response = await fetch(url, { ...options, method: 'POST' });
+    }
+    return response;
+  };
+
+  try {
+    // Attempt 1: Proxy
+    console.log('Attempting request via proxy...');
+    lastResponse = await tryRequestMethods(proxyApiUrl, { headers, body });
+
+    // Attempt 2: Direct API if proxy failed
+    if (!lastResponse.ok) {
+      console.warn('Proxy request failed, trying direct API call...');
+      lastResponse = await tryRequestMethods(directApiUrl, { headers: directHeaders, body, mode: 'cors' });
+    }
+  } catch (error) {
+    console.error('A network error occurred:', error);
+    throw new Error('Gagal terhubung ke server. Periksa koneksi internet Anda.');
+  }
+
+  // Check final result
+  if (!lastResponse.ok) {
+    let errorMessage = `Gagal memperbarui laporan. Status: ${lastResponse.status}.`;
+    if (lastResponse.status === 422) {
+      try {
+        const errorData = await lastResponse.json();
+        if (errorData && errorData.errors) {
+          const errorFields = Object.keys(errorData.errors).join(', ');
+          errorMessage = `Validasi gagal (422). Bidang yang bermasalah: ${errorFields}`;
+        } else if (errorData && errorData.message) {
+          errorMessage = `Validasi gagal (422): ${errorData.message}`;
+        }
+      } catch (e) { /* ignore parsing error */ }
+    }
+    throw new Error(errorMessage);
+  }
+
+  return lastResponse.json();
+};
+
 
 export default function ReportsManagement() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("new");
   const [expandedReportId, setExpandedReportId] = useState(null);
-  const [newResponse, setNewResponse] = useState('');
+  
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setError] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    // Fetch user profile
+    fetchUserProfile();
+    
+    // Fetch reports
+    fetchReports();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.error('No token found for user profile fetch');
+        return;
+      }
+      
+      console.log('Fetching user profile...');
+      // Adjust the endpoint based on your actual API
+      const response = await fetch('/api/proxy?endpoint=user/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error(`Error fetching user profile: ${response.status} ${response.statusText}`);
+        
+        // Try a direct API call as fallback
+        try {
+          console.log('Trying direct API call for user profile');
+          const directResponse = await fetch('http://127.0.0.1:8000/api/user/profile', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Origin': window.location.origin
+            },
+            mode: 'cors'
+          });
+          
+          if (directResponse.ok) {
+            console.log('Direct API call for user profile succeeded');
+            const data = await directResponse.json();
+            console.log('User profile from direct API:', data);
+            setUserProfile(data);
+            return;
+          } else {
+            console.error(`Direct API call for user profile failed: ${directResponse.status}`);
+          }
+        } catch (directErr) {
+          console.error('Direct API call for user profile failed:', directErr);
+        }
+        
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('User profile fetched successfully:', data);
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+    }
+  };
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setError('Token tidak ditemukan. Silakan login terlebih dahulu.');
+        setLoading(false);
+        return;
+      }
+
+      // Use API endpoint to fetch all reports
+      const apiUrl = `/api/proxy?endpoint=laporan`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        // Try fallback approach if API returns 404
+        if (response.status === 404) {
+          console.warn('API endpoint returned 404, trying with direct URL...');
+          
+          const fallbackUrl = 'http://127.0.0.1:8000/api/laporan';
+          const fallbackResponse = await fetch(fallbackUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Origin': window.location.origin
+            },
+            mode: 'cors'
+          });
+          
+          if (fallbackResponse.ok) {
+            const data = await fallbackResponse.json();
+            processReportsData(data);
+            return;
+          }
+        }
+        
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Reports fetched:', data);
+      processReportsData(data);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      setError(`Gagal mengambil data laporan: ${error.message}`);
+      setLoading(false);
+    }
+  };
+
+  const processReportsData = (data) => {
+    try {
+      // Extract reports based on different possible response formats
+      let reportData = [];
+      if (Array.isArray(data)) {
+        reportData = data;
+      } else if (data.data && Array.isArray(data.data)) {
+        reportData = data.data;
+      } else {
+        console.warn('Unexpected API response format:', data);
+        if (typeof data === 'object' && data !== null) {
+          const possibleDataFields = Object.keys(data).filter(key => 
+            Array.isArray(data[key]) && data[key].length > 0
+          );
+          
+          if (possibleDataFields.length > 0) {
+            reportData = data[possibleDataFields[0]];
+          }
+        }
+      }
+      
+      // Transform the report data to match our frontend structure
+      const transformedReports = reportData.map(report => {
+        // Parse responses if they exist
+        let responses = [];
+        if (report.respon) {
+          try {
+            if (typeof report.respon === 'string') {
+              // Try to parse responses if they're stored as JSON string
+              responses = JSON.parse(report.respon);
+            } else if (Array.isArray(report.respon)) {
+              responses = report.respon;
+            } else if (typeof report.respon === 'object') {
+              responses = [report.respon];
+            }
+          } catch (e) {
+            // If parsing fails, assume it's a single response
+            responses = [{
+              message: report.respon,
+              timestamp: report.waktu_respon || new Date().toISOString(),
+              author: report.oleh || 'Admin'
+            }];
+          }
+        }
+        
+        // If responses is not an array or is empty but we have oleh/waktu_respon fields
+        if ((!Array.isArray(responses) || responses.length === 0) && (report.oleh || report.waktu_respon)) {
+          responses = [{
+            message: report.respon || 'Laporan telah ditanggapi',
+            timestamp: report.waktu_respon || new Date().toISOString(),
+            author: report.oleh || 'Admin'
+          }];
+        }
+        
+        return {
+          id: report.id_laporan || report.id,
+          title: report.judul,
+          category: report.kategori,
+          urgency: report.prioritas || 'Medium',
+          date: report.tanggal_lapor,
+          status: mapStatus(report.status),
+          description: report.deskripsi,
+          submittedBy: report.nama_pelapor || 'Pengguna',
+          submittedAt: formatDateTime(report.tanggal_lapor, report.waktu_lapor),
+          estimatedTime: '',
+          responses: responses,
+          // Keep the original data for reference when updating
+          original: report
+        };
+      });
+      
+      console.log('Transformed reports:', transformedReports);
+      setReports(transformedReports);
+      setLoading(false);
+      setError(null);
+    } catch (error) {
+      console.error('Error processing report data:', error);
+      setError('Terjadi kesalahan saat memproses data laporan');
+      setLoading(false);
+    }
+  };
+
+  const handleTabChange = (value) => {
+    setActiveTab(value);
+    setExpandedReportId(null); // Close any expanded report when changing tabs
+  };
 
   const toggleReportDetail = (reportId) => {
     if (expandedReportId === reportId) {
@@ -123,78 +371,273 @@ export default function ReportsManagement() {
     }
   };
 
-  const handleSubmitResponse = () => {
-    // Handle response submission logic here
-    console.log('Response submitted:', newResponse);
-    setNewResponse('');
+  const handleSubmitResponse = async (reportId, responseText) => {
+    try {
+      if (!responseText.trim()) {
+        toast({
+          title: "Tidak dapat mengirim",
+          description: "Respon tidak boleh kosong",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const reportToUpdate = reports.find(r => r.id === reportId);
+      if (!reportToUpdate) {
+        toast({
+          title: "Error",
+          description: "Laporan tidak ditemukan",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const now = new Date();
+      const formattedDate = now.toISOString();
+      const adminName = userProfile ? (userProfile.name || userProfile.nama || 'Admin') : 'Admin';
+
+      const newResponseObj = {
+        message: responseText,
+        timestamp: formattedDate,
+        author: adminName
+      };
+
+      const payload = {
+        id: reportId,
+        status: 'In Progress',
+        respon: responseText,
+        oleh: adminName,
+        waktu_respon: formattedDate
+      };
+
+      console.log('Sending payload to backend:', payload);
+      await updateReportRequest(reportId, payload);
+
+      // Update local state
+      const updatedReports = reports.map(report => {
+        if (report.id === reportId) {
+          return {
+            ...report,
+            status: 'inProgress',
+            responses: [...(report.responses || []), newResponseObj]
+          };
+        }
+        return report;
+      });
+      setReports(updatedReports);
+
+      toast({
+        title: "Berhasil",
+        description: "Respon telah dikirim",
+        variant: "default"
+      });
+
+      fetchReports();
+
+    } catch (error) {
+      console.error('Error submitting response:', error);
+      toast({
+        title: "Gagal",
+        description: `Terjadi kesalahan saat mengirim respon: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleResolveReport = async (reportId) => {
+    try {
+      const reportToUpdate = reports.find(r => r.id === reportId);
+      if (!reportToUpdate) {
+        toast({
+          title: "Error",
+          description: "Laporan tidak ditemukan",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const adminName = userProfile ? (userProfile.name || userProfile.nama || 'Admin') : 'Admin';
+      const responseText = reportToUpdate.original.respon || "Laporan telah ditangani dan diselesaikan.";
+      const responseDate = reportToUpdate.original.waktu_respon || new Date().toISOString();
+
+      const payload = {
+        id: reportId,
+        status: 'Selesai',
+        respon: responseText,
+        oleh: adminName,
+        waktu_respon: responseDate
+      };
+
+      console.log('Sending payload to backend for status update:', payload);
+      await updateReportRequest(reportId, payload);
+
+      // Update local state
+      const updatedReports = reports.map(report => {
+        if (report.id === reportId) {
+          return {
+            ...report,
+            status: 'archived'
+          };
+        }
+        return report;
+      });
+      setReports(updatedReports);
+
+      toast({
+        title: "Berhasil",
+        description: "Status laporan telah diubah menjadi Selesai",
+        variant: "default"
+      });
+
+      fetchReports();
+
+    } catch (error) {
+      console.error('Error updating report status:', error);
+      toast({
+        title: "Gagal",
+        description: `Terjadi kesalahan saat mengubah status laporan: ${error.message}`,
+        variant: "destructive"
+      });
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Manajemen Laporan</h1>
+        <Button
+          variant="outline"
+          onClick={fetchReports}
+          className="gap-2"
+          disabled={loading}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertCircle className="h-4 w-4" />}
+          Refresh Data
+        </Button>
       </div>
 
-      {/* Tabs & Content */}
-      <Tabs defaultValue="new" className="w-full">
-        <TabsList>
-          <TabsTrigger value="new" className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" /> Laporan Baru
-          </TabsTrigger>
-          <TabsTrigger value="inProgress" className="flex items-center gap-2">
-            <XCircle className="w-4 h-4" /> Sedang Progres
-          </TabsTrigger>
-          <TabsTrigger value="archived" className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4" /> Ditangani
-          </TabsTrigger>
-        </TabsList>
+      {errorMessage && (
+        <Alert variant="destructive">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
 
-        <TabsContent value="new" className="mt-6">
-          {DUMMY_REPORTS.filter(report => report.status === "new").map((report) => (
-            <ExpandableReportCard 
-              key={report.id} 
-              report={report} 
-              isExpanded={expandedReportId === report.id}
-              onToggleDetail={() => toggleReportDetail(report.id)}
-              onSubmitResponse={handleSubmitResponse}
-            />
-          ))}
-        </TabsContent>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-10">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Memuat data laporan...</p>
+        </div>
+      ) : (
+        // Tabs & Content
+        <Tabs defaultValue="new" className="w-full" onValueChange={handleTabChange}>
+          <TabsList>
+            <TabsTrigger value="new" className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" /> Laporan Baru
+              <span className="bg-blue-100 text-blue-600 rounded-full text-xs px-2 py-0.5 ml-1">
+                {reports.filter(report => report.status === "new").length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="inProgress" className="flex items-center gap-2">
+              <Clock className="w-4 h-4" /> Sedang Progres
+              <span className="bg-orange-100 text-orange-600 rounded-full text-xs px-2 py-0.5 ml-1">
+                {reports.filter(report => report.status === "inProgress").length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="archived" className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" /> Ditangani
+              <span className="bg-green-100 text-green-600 rounded-full text-xs px-2 py-0.5 ml-1">
+                {reports.filter(report => report.status === "archived").length}
+              </span>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="inProgress" className="mt-6">
-          {DUMMY_REPORTS.filter(report => report.status === "inProgress").map((report) => (
-            <ExpandableReportCard 
-              key={report.id} 
-              report={report} 
-              isExpanded={expandedReportId === report.id}
-              onToggleDetail={() => toggleReportDetail(report.id)}
-              onSubmitResponse={handleSubmitResponse}
-            />
-          ))}
-        </TabsContent>
+          <TabsContent value="new" className="mt-6">
+            {reports.filter(report => report.status === "new").length === 0 ? (
+              <div className="text-center py-10 border rounded-md">
+                <p className="text-muted-foreground">Tidak ada laporan baru</p>
+              </div>
+            ) : (
+              reports.filter(report => report.status === "new").map((report) => (
+                <ExpandableReportCard 
+                  key={report.id} 
+                  report={report} 
+                  isExpanded={expandedReportId === report.id}
+                  onToggleDetail={() => toggleReportDetail(report.id)}
+                  onSubmitResponse={(responseText) => handleSubmitResponse(report.id, responseText)}
+                />
+              ))
+            )}
+          </TabsContent>
 
-        <TabsContent value="archived" className="mt-6">
-          {DUMMY_REPORTS.filter(report => report.status === "archived").map((report) => (
-            <ExpandableReportCard 
-              key={report.id} 
-              report={report} 
-              isExpanded={expandedReportId === report.id}
-              onToggleDetail={() => toggleReportDetail(report.id)}
-              onSubmitResponse={handleSubmitResponse}
-            />
-          ))}
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="inProgress" className="mt-6">
+            {reports.filter(report => report.status === "inProgress").length === 0 ? (
+              <div className="text-center py-10 border rounded-md">
+                <p className="text-muted-foreground">Tidak ada laporan yang sedang diproses</p>
+              </div>
+            ) : (
+              reports.filter(report => report.status === "inProgress").map((report) => (
+                <div key={report.id} className="relative">
+                  <ExpandableReportCard 
+                    report={report} 
+                    isExpanded={expandedReportId === report.id}
+                    onToggleDetail={() => toggleReportDetail(report.id)}
+                    onSubmitResponse={(responseText) => handleSubmitResponse(report.id, responseText)}
+                  />
+                  <div className="absolute top-4 right-4">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleResolveReport(report.id)}
+                      className="bg-green-100 text-green-600 hover:bg-green-200 border border-green-200"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1" /> Tandai Selesai
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="archived" className="mt-6">
+            {reports.filter(report => report.status === "archived").length === 0 ? (
+              <div className="text-center py-10 border rounded-md">
+                <p className="text-muted-foreground">Tidak ada laporan yang telah ditangani</p>
+              </div>
+            ) : (
+              reports.filter(report => report.status === "archived").map((report) => (
+                <ExpandableReportCard 
+                  key={report.id} 
+                  report={report} 
+                  isExpanded={expandedReportId === report.id}
+                  onToggleDetail={() => toggleReportDetail(report.id)}
+                  onSubmitResponse={(responseText) => handleSubmitResponse(report.id, responseText)}
+                  readOnly={true}
+                />
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
+
+      <Toaster />
     </div>
   );
 }
 
-function ExpandableReportCard({ report, isExpanded, onToggleDetail, onSubmitResponse }) {
+function ExpandableReportCard({ 
+  report, 
+  isExpanded, 
+  onToggleDetail, 
+  onSubmitResponse, 
+  readOnly = false 
+}) {
   const [newResponse, setNewResponse] = useState('');
   const [height, setHeight] = useState('auto');
   const [isContentVisible, setIsContentVisible] = useState(false);
   const detailRef = useRef(null);
   const [isHeightSet, setIsHeightSet] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Content size observer with improved height management
   useEffect(() => {
@@ -243,12 +686,22 @@ function ExpandableReportCard({ report, isExpanded, onToggleDetail, onSubmitResp
   }, [isExpanded]);
   
   // Handle response submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (newResponse.trim()) {
-      onSubmitResponse(newResponse);
-      setNewResponse('');
+      setIsSubmitting(true);
+      try {
+        await onSubmitResponse(newResponse);
+        setNewResponse('');
+      } catch (error) {
+        console.error("Error submitting response:", error);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
+
+  // Format date for display
+  const displayDate = report.date ? formatDate(report.date) : 'Tidak diketahui';
   
   return (
     <Card 
@@ -268,7 +721,7 @@ function ExpandableReportCard({ report, isExpanded, onToggleDetail, onSubmitResp
               {report.urgency}
             </span>
             <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hidden sm:inline-block">
-              {report.date}
+              {displayDate}
             </span>
           </div>
         </div>
@@ -335,8 +788,68 @@ function ExpandableReportCard({ report, isExpanded, onToggleDetail, onSubmitResp
               }`}
             >
               <Clock className="w-4 h-4 flex-shrink-0" />
+              <span>Estimasi waktu penanganan: {report.estimatedTime}</span>
             </div>
           ) : null}
+
+          {/* Attachment display if available */}
+          {report.original && report.original.lampiran && (
+            <div className="mb-4 mt-2">
+              <h4 className="font-semibold mb-2">Lampiran:</h4>
+              <div className="overflow-hidden rounded-md border border-gray-200">
+                {(() => {
+                  // Format the attachment URL
+                  const attachmentPath = report.original.lampiran;
+                  let attachmentUrl;
+                  
+                  if (attachmentPath.includes('public/uploads/')) {
+                    const fileName = attachmentPath.split('/').pop();
+                    attachmentUrl = `/uploads/${fileName}`;
+                  } else if (attachmentPath.includes('/uploads/') || attachmentPath.includes('/storage/')) {
+                    attachmentUrl = attachmentPath;
+                  } else if (attachmentPath.startsWith('lampiran/')) {
+                    attachmentUrl = `/uploads/${attachmentPath}`;
+                  } else if (attachmentPath.startsWith('lampiran_')) {
+                    attachmentUrl = `/uploads/${attachmentPath}`;
+                  } else {
+                    attachmentUrl = `/uploads/${attachmentPath}`;
+                  }
+                  
+                  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentPath);
+                  
+                  if (isImage) {
+                    return (
+                      <img 
+                        src={attachmentUrl} 
+                        alt="Lampiran" 
+                        className="w-full max-h-64 object-contain"
+                        onError={(e) => {
+                          // Try alternative paths if initial load fails
+                          const fileName = attachmentPath.split('/').pop();
+                          e.target.src = `/uploads/${fileName}`;
+                          e.target.onerror = () => {
+                            e.target.src = `/storage/${fileName}`;
+                            e.target.onerror = null;
+                          };
+                        }}
+                      />
+                    );
+                  } else {
+                    return (
+                      <a 
+                        href={attachmentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 underline text-sm flex items-center gap-2 p-4"
+                      >
+                        <FileText className="w-5 h-5" /> Lihat Lampiran
+                      </a>
+                    );
+                  }
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* Response Section - Made more responsive and adaptive */}
           <div 
@@ -356,7 +869,9 @@ function ExpandableReportCard({ report, isExpanded, onToggleDetail, onSubmitResp
                     <div className="flex flex-wrap gap-2 mt-2 text-xs text-gray-500">
                       <span>{response.author}</span>
                       <span>•</span>
-                      <span>{response.timestamp}</span>
+                      <span>{typeof response.timestamp === 'string' ? 
+                        formatDateTime(new Date(response.timestamp)) : 
+                        formatDateTime(response.timestamp)}</span>
                     </div>
                   </div>
                 ))
@@ -365,46 +880,37 @@ function ExpandableReportCard({ report, isExpanded, onToggleDetail, onSubmitResp
               )}
             </div>
 
-            <div className="space-y-4 mb-2">
-              <div>
-                <h4 className="font-semibold mb-2">Berikan Respon</h4>
-                <Textarea 
-                  placeholder="Tulis respon..." 
-                  value={newResponse}
-                  onChange={(e) => setNewResponse(e.target.value)}
-                  className="transition-all focus:border-blue-400 hover:border-gray-300 min-h-[120px] text-base"
-                />
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="w-full sm:w-1/2">
-                  <label className="block text-sm font-medium mb-1 text-gray-700">
-                    Estimasi Waktu Penyelesaian
-                  </label>
-                  <Select defaultValue="3">
-                    <SelectTrigger className="w-full sm:w-[200px] transition-all focus:border-blue-400 hover:border-gray-300 bg-white h-10">
-                      <SelectValue placeholder="Estimasi waktu" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 hari</SelectItem>
-                      <SelectItem value="3">3 hari</SelectItem>
-                      <SelectItem value="7">1 minggu</SelectItem>
-                      <SelectItem value="14">2 minggu</SelectItem>
-                    </SelectContent>
-                  </Select>
+            {!readOnly && (
+              <div className="space-y-4 mb-2">
+                <div>
+                  <h4 className="font-semibold mb-2">Berikan Respon</h4>
+                  <Textarea 
+                    placeholder="Tulis respon..." 
+                    value={newResponse}
+                    onChange={(e) => setNewResponse(e.target.value)}
+                    className="transition-all focus:border-blue-400 hover:border-gray-300 min-h-[120px] text-base"
+                    disabled={isSubmitting}
+                  />
                 </div>
                 
-                <div className="w-full sm:w-1/2 flex items-end">
+                <div className="flex justify-end">
                   <Button 
                     onClick={handleSubmit}
-                    className="transition-all hover:bg-blue-600 active:scale-95 h-10 w-full sm:w-auto text-base"
-                    disabled={!newResponse.trim()}
+                    className="transition-all hover:bg-blue-600 active:scale-95 h-10 text-base"
+                    disabled={!newResponse.trim() || isSubmitting}
                   >
-                    Kirim Respon
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Mengirim...
+                      </>
+                    ) : (
+                      'Kirim Respon'
+                    )}
                   </Button>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -416,6 +922,7 @@ function StatusBadge({ status }) {
   const getStatusStyle = () => {
     switch (status) {
       case 'Completed':
+      case 'Selesai':
         return 'bg-green-100 text-green-600';
       case 'In Progress':
         return 'bg-blue-100 text-blue-600';
@@ -438,6 +945,8 @@ function UrgencyBadge({ urgency }) {
         return 'bg-red-100 text-red-600';
       case 'Medium':
         return 'bg-orange-100 text-orange-600';
+      case 'Low':
+        return 'bg-gray-100 text-gray-600';
       default:
         return 'bg-gray-100 text-gray-600';
     }
@@ -457,7 +966,7 @@ function getStatusText(status) {
     case 'inProgress':
       return 'In Progress';
     case 'archived':
-      return 'Completed';
+      return 'Selesai';
     default:
       return 'Pending';
   }

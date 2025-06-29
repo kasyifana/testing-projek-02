@@ -17,6 +17,50 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import Lottie from 'lottie-react';
 import { useRouter } from 'next/navigation';
 
+// Helper function to group programs by degree level
+const groupProgramsByLevel = (programList) => {
+	const groups = {
+		'D3': [],
+		'Sarjana Terapan': [],
+		'S1': [],
+		'S2': [],
+		'S3': [],
+		'Profesi': []
+	};
+	
+	programList.forEach(program => {
+		const code = program.code || '';
+		const name = program.name || '';
+		const value = program.code || program.id?.toString() || '';
+		
+		// Determine category based on code prefix
+		if (code.startsWith('d3_')) {
+			groups['D3'].push({ value, label: name });
+		} else if (code.startsWith('st_')) {
+			groups['Sarjana Terapan'].push({ value, label: name });
+		} else if (code.startsWith('s1_')) {
+			groups['S1'].push({ value, label: name });
+		} else if (code.startsWith('s2_')) {
+			groups['S2'].push({ value, label: name });
+		} else if (code.startsWith('s3_')) {
+			groups['S3'].push({ value, label: name });
+		} else if (code.startsWith('prof_')) {
+			groups['Profesi'].push({ value, label: name });
+		} else {
+			// Default to S1 if no clear category
+			groups['S1'].push({ value, label: name });
+		}
+	});
+	
+	// Convert to the format expected by the component and filter out empty groups
+	return Object.entries(groups)
+		.filter(([category, items]) => items.length > 0)
+		.map(([category, items]) => ({
+			category,
+			items: items.sort((a, b) => a.label.localeCompare(b.label))
+		}));
+};
+
 // Empty initialization - will be populated from database
 
 const registerSchema = z.object({
@@ -56,42 +100,75 @@ export function RegisterDialog({ isOpen, onClose }) {
 			})
 			.catch(error => {
 				console.error("Failed to load animation:", error);
-			});
-					// Fetch program study options from PHP API
+			});		// Fetch program study options from external PHP API
 		setIsLoadingPrograms(true);
-		fetch('http://localhost/testing-projek-02-master/src/php/program_study.php')
+		fetch('http://127.0.0.1:8000/api/program-studi', {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+				'Accept': 'application/json',
+			},
+			mode: 'cors', // Enable CORS for external API
+		})
 			.then(response => {
 				if (!response.ok) {
-					throw new Error('Network response was not ok');
+					throw new Error(`HTTP error! status: ${response.status}`);
 				}
 				return response.json();
-			})			.then(data => {
+			})
+			.then(data => {
 				console.log("Fetched program study data:", data);
-				// Handle both normal response and debug response
-				const programData = data.data ? data.data : data;
 				
-				// If there's an error property, it means there was an error
+				// Handle different response formats
+				let programList = [];
+				if (data.data && Array.isArray(data.data)) {
+					programList = data.data;
+				} else if (Array.isArray(data)) {
+					programList = data;
+				} else if (data.success && data.data) {
+					programList = data.data;
+				} else {
+					throw new Error('Invalid API response format');
+				}
+				
+				// Check for API errors
 				if (data.error) {
 					console.error("Error from API:", data.error);
 					throw new Error(data.error);
 				}
 				
-				setProgramStudyOptions(programData);
+				// Group programs by degree level
+				const groupedPrograms = groupProgramsByLevel(programList);
+				setProgramStudyOptions(groupedPrograms);
+				
 				// Flatten the options for easier search
-				const flatOptions = programData.flatMap(group => 
+				const flatOptions = groupedPrograms.flatMap(group => 
 					group.items.map(item => ({ value: item.value, label: item.label }))
 				);
 				setFlatProgramStudyOptions(flatOptions);
-			})
-			.catch(error => {
+			})			.catch(error => {
 				console.error("Failed to load program study data:", error);
+				
+				// Provide more specific error messages
+				let errorMessage = "Failed to load program study data. ";
+				if (error.message.includes('CORS')) {
+					errorMessage += "CORS error - please check server configuration.";
+				} else if (error.message.includes('HTTP error')) {
+					errorMessage += "Server returned an error. Please check the API endpoint.";
+				} else if (error.message.includes('fetch')) {
+					errorMessage += "Network error - please check your connection and server.";
+				} else {
+					errorMessage += "Please try again later.";
+				}
+				
 				// Fallback empty structure in case of error
 				setProgramStudyOptions([]);
 				setFlatProgramStudyOptions([]);
+				
 				// Show toast with error
 				toast({
-					title: "Error",
-					description: "Failed to load program study data. Please try again later.",
+					title: "Error Loading Program Studies",
+					description: errorMessage,
 					variant: "destructive"
 				});
 			})
@@ -112,25 +189,51 @@ export function RegisterDialog({ isOpen, onClose }) {
 		},
 	});
 
-	const watchRole = form.watch('role');
-	function onSubmit(data) {
+	const watchRole = form.watch('role');	function onSubmit(data) {
 		console.log("Form submitted with data:", data);
-				// Send registration data to PHP endpoint
-		fetch('http://localhost/testing-projek-02-master/src/php/register.php', {
+		
+		// Send registration data to external PHP API endpoint
+		fetch('http://127.0.0.1:8000/api/register', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
+				'Accept': 'application/json',
 			},
-			body: JSON.stringify(data),
-		})
-		.then(response => {
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
+			mode: 'cors', // Enable CORS for external API
+			body: JSON.stringify(data),		})
+		.then(async response => {
+			const responseData = await response.json();
+			console.log("API Response:", { status: response.status, data: responseData });
+			
+			// Jika response 422, ambil pesan validasi error dari server
+			if (response.status === 422) {
+				// Format Laravel validation error messages
+				if (responseData.errors) {
+					// Ambil pesan error pertama dari setiap field
+					const errorMessages = Object.values(responseData.errors)
+						.map(errors => errors[0])
+						.join(', ');
+					throw new Error(`Validation error: ${errorMessages}`);
+				} else if (responseData.message) {
+					throw new Error(responseData.message);
+				}
 			}
-			return response.json();
-		})
-		.then(result => {
-			if (result.success) {
+			
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+			
+			return responseData;
+		}).then(result => {
+			console.log("Registration API response:", result);			// Check for success in different API response formats
+			const isSuccess = 
+				result.success || // format: { success: true, ... }
+				(result.message && result.message.includes("success")) || // format: { message: "Registration successful" }
+				(result.status && result.status === 201) || // format: { status: 201, ... }
+				(result.id && result.name) || // format: direct user object returned
+				result.user; // format: { user: {...} } - respons pengembalian user
+				
+			if (isSuccess) {
 				// Make toast exactly like in LogoutDialog
 				toast({
 					title: 'Registrasi Berhasil!',
@@ -173,13 +276,30 @@ export function RegisterDialog({ isOpen, onClose }) {
 					description: result.message || 'An error occurred during registration. Please try again.',
 					variant: 'destructive',
 				});
+				
+				console.error("Registration failed with response:", result);
 			}
-		})
-		.catch(error => {
+		})		.catch(error => {
 			console.error('Error during registration:', error);
+			
+			// Provide more specific error messages
+			let errorMessage = "";
+			if (error.message.includes('Validation error:')) {
+				// Gunakan pesan validasi langsung dari server
+				errorMessage = error.message;
+			} else if (error.message.includes('CORS')) {
+				errorMessage = "CORS error - please check server configuration.";
+			} else if (error.message.includes('HTTP error')) {
+				errorMessage = "Server returned an error. Please check the API endpoint.";
+			} else if (error.message.includes('fetch')) {
+				errorMessage = "Network error - please check your connection and server.";
+			} else {
+				errorMessage = "An error occurred during registration. Please try again.";
+			}
+			
 			toast({
 				title: 'Registration Failed',
-				description: 'An error occurred during registration. Please try again.',
+				description: errorMessage,
 				variant: 'destructive',
 			});
 		});

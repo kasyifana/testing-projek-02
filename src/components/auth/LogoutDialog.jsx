@@ -25,11 +25,60 @@ export function useLogoutHandler() {
   }, []);
 
   const handleLogout = async () => {
-    // Hapus session di server
-    await fetch('/testing-projek-02-master/src/php/auth/logout.php', { method: 'POST', credentials: 'include' });
+    // Ambil token dari localStorage
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    
+    // Attempt to log out on the server, but don't wait for completion or let errors block the process
+    if (token) {
+      // First try the proxy endpoint (which might handle errors better)
+      fetch('/api/proxy?endpoint=logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        // Don't use await - we don't want errors to stop the local logout
+      }).catch(error => {
+        // Silently catch - we'll proceed with local logout regardless
+        console.log('Proxy logout error (continuing with local logout):', error);
+      });
+      
+      // Also try the direct endpoint as a backup, but with a timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout
+      
+      try {
+        fetch('http://127.0.0.1:8000/api/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+          // No credentials include to avoid CORS issues
+        }).catch(() => {
+          // Ignore errors from direct API call
+        }).finally(() => {
+          clearTimeout(timeoutId);
+        });
+      } catch (e) {
+        // Ignore errors completely
+      }
+    }
+    
+    // Always clear local storage data regardless of API response
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('userName');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('tokenExpiration');
+      localStorage.removeItem('loginTime');
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('readNotifications');
     }
 
     // Show toast notification with Lottie animation

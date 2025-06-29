@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test PHP Backend File Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test PHP Backend File Upload</h1>
+    
+    <form id="testForm">
+        <div>
+            <label for="judul">Judul:</label>
+            <input type="text" id="judul" name="judul" value="Test Report" required>
+        </div>
+        <div>
+            <label for="kategori">Kategori:</label>
+            <select id="kategori" name="kategori" required>
+                <option value="fasilitas">Fasilitas</option>
+                <option value="kekerasan">Kekerasan</option>
+                <option value="akademik">Akademik</option>
+                <option value="lainnya">Lainnya</option>
+            </select>
+        </div>
+        <div>
+            <label for="deskripsi">Deskripsi:</label>
+            <textarea id="deskripsi" name="deskripsi" required>This is a test report</textarea>
+        </div>
+        <div>
+            <label for="prioritas">Prioritas:</label>
+            <select id="prioritas" name="prioritas" required>
+                <option value="High">Mendesak</option>
+                <option value="Medium">Normal</option>
+                <option value="Low">Rendah</option>
+            </select>
+        </div>
+        <div>
+            <label for="lampiran">File:</label>
+            <input type="file" id="lampiran" name="lampiran">
+        </div>
+        <button type="button" id="sendButton">Send Test Request</button>
+    </form>
+    
+    <div class="result" id="result">
+        <h3>Result will appear here</h3>
+    </div>
+
+    <script>
+        document.getElementById('sendButton').addEventListener('click', async function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<h3>Sending request...</h3>';
+            
+            const formData = new FormData();
+            formData.append('judul', document.getElementById('judul').value);
+            formData.append('kategori', document.getElementById('kategori').value);
+            formData.append('deskripsi', document.getElementById('deskripsi').value);
+            formData.append('prioritas', document.getElementById('prioritas').value);
+            
+            const now = new Date();
+            const currentDate = now.toISOString().split('T')[0];
+            const currentTime = now.toTimeString().split(' ')[0];
+            
+            formData.append('tanggal_lapor', currentDate);
+            formData.append('waktu_lapor', currentTime);
+            formData.append('status', 'Pending');
+            
+            const fileInput = document.getElementById('lampiran');
+            if (fileInput.files.length > 0) {
+                formData.append('lampiran', fileInput.files[0]);
+            }
+            
+            // Log form data for debugging
+            console.log('Form data being sent:');
+            for (const pair of formData.entries()) {
+                if (pair[0] === 'lampiran' && pair[1] instanceof File) {
+                    console.log(pair[0], {
+                        name: pair[1].name,
+                        type: pair[1].type,
+                        size: pair[1].size
+                    });
+                } else {
+                    console.log(pair[0], pair[1]);
+                }
+            }
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/laporan', {
+                    method: 'POST',
+                    body: formData,
+                    // No Content-Type header - browser sets it with boundary
+                    mode: 'cors',
+                    credentials: 'include'
+                });
+                
+                let responseText = await response.text();
+                let resultHTML = `
+                    <h3>Response Status: ${response.status} ${response.statusText}</h3>
+                    <h4>Response Headers:</h4>
+                    <pre>${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}</pre>
+                    <h4>Response Body:</h4>
+                    <pre>${responseText}</pre>
+                `;
+                
+                // Try to parse as JSON for better display
+                try {
+                    const jsonData = JSON.parse(responseText);
+                    resultHTML += `<h4>Parsed JSON:</h4><pre>${JSON.stringify(jsonData, null, 2)}</pre>`;
+                } catch (e) {
+                    // Not JSON, that's fine
+                }
+                
+                resultDiv.innerHTML = resultHTML;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3>Error:</h3>
+                    <pre style="color: red">${error.message}</pre>
+                `;
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

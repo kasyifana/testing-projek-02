@@ -89,10 +89,9 @@ export function Navbar() {
               >
                 {item.label}
               </Link>
-            ))}
-            {isLoggedIn && (
-              <Link href="/lapor" className="text-accent font-semibold hover:text-primary">
-                Buat Laporan
+            ))}            {isLoggedIn && (
+              <Link href="/user/dashboard" className="text-accent font-semibold hover:text-primary">
+                Dashboard
               </Link>
             )}
           </nav>
