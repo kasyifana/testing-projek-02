@@ -142,7 +142,7 @@ export default function FeedbackPage() {
         Hindari memberikan janji spesifik tentang waktu penyelesaian.
         Berterima kasih atas masukan pengguna.
       `;
-      
+
       // Buat sesi chat
       const chatSession = await createChatSession();
       

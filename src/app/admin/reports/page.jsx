@@ -12,7 +12,9 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Loader2
+  Loader2,
+  Languages,
+  FileText
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -25,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { createChatSession } from '@/ai/genkit';
 
 // Format date to locale string
 const formatDate = (dateString) => {
@@ -152,6 +155,8 @@ export default function ReportsManagement() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setError] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+  const [translatedReports, setTranslatedReports] = useState({});
+  const [translatingReports, setTranslatingReports] = useState({});
 
   useEffect(() => {
     // Fetch user profile
@@ -501,6 +506,154 @@ export default function ReportsManagement() {
     }
   };
 
+  const translateText = async (text, targetLang = 'id') => {
+    try {
+      // Check if text is likely already in Indonesian
+      const indonesianWords = ['dan', 'atau', 'yang', 'untuk', 'dengan', 'pada', 'di', 'ke', 'dari', 'adalah', 'akan', 'tidak', 'ini', 'itu', 'saya', 'kamu', 'kami', 'mereka', 'kampus', 'laporan', 'masalah'];
+      const words = text.toLowerCase().split(' ');
+      const indonesianWordsCount = words.filter(word => indonesianWords.includes(word)).length;
+      
+      // If more than 25% of words are Indonesian, skip translation
+      if (indonesianWordsCount / words.length > 0.25) {
+        return text;
+      }
+
+      // System instruction for translation
+      const systemInstruction = `
+        Anda adalah penerjemah profesional yang bertugas menerjemahkan teks ke Bahasa Indonesia.
+        Tugas Anda:
+        1. Terjemahkan teks yang diberikan ke Bahasa Indonesia yang natural dan mudah dipahami
+        2. Pertahankan konteks dan makna asli dari teks
+        3. Gunakan bahasa yang formal namun mudah dipahami
+        4. Jika teks sudah dalam Bahasa Indonesia, kembalikan teks asli tanpa perubahan
+        5. Untuk istilah teknis atau nama tempat, pertahankan nama aslinya jika tidak ada padanan yang tepat
+        6. Fokus pada konteks laporan kampus dan aduan
+        
+        Format output: Berikan hanya hasil terjemahan tanpa penjelasan tambahan.
+      `;
+
+      // Create chat session for translation
+      const chat = await createChatSession([], systemInstruction);
+      
+      // Prepare translation prompt
+      const prompt = `Terjemahkan teks berikut ke Bahasa Indonesia:
+
+"${text}"
+
+Hasil terjemahan:`;
+
+      // Get translation from AI
+      const aiResponse = await chat.sendMessage(prompt);
+      
+      // Clean up the response (remove quotes, extra whitespace, etc.)
+      let translatedText = aiResponse.trim();
+      
+      // Remove surrounding quotes if present
+      if ((translatedText.startsWith('"') && translatedText.endsWith('"')) ||
+          (translatedText.startsWith("'") && translatedText.endsWith("'"))) {
+        translatedText = translatedText.slice(1, -1);
+      }
+      
+      // If translation seems to be the same or very similar, return original
+      if (translatedText.toLowerCase() === text.toLowerCase()) {
+        return text;
+      }
+      
+      return translatedText.trim();
+      
+    } catch (error) {
+      console.error('AI Translation error:', error);
+      // Always return original text as fallback
+      return text;
+    }
+  };
+
+  const handleTranslateReport = async (reportId) => {
+    try {
+      setTranslatingReports(prev => ({ ...prev, [reportId]: true }));
+      
+      const report = reports.find(r => r.id === reportId);
+      if (!report) {
+        throw new Error('Laporan tidak ditemukan');
+      }
+
+      // Show loading toast
+      toast({
+        title: "Menerjemahkan dengan AI...",
+        description: "AI sedang menerjemahkan laporan ke Bahasa Indonesia",
+        variant: "default"
+      });
+
+      const [translatedTitle, translatedDescription] = await Promise.all([
+        translateText(report.title),
+        translateText(report.description)
+      ]);
+
+      // Check if translation actually changed the text
+      const titleChanged = translatedTitle !== report.title;
+      const descriptionChanged = translatedDescription !== report.description;
+      
+      if (!titleChanged && !descriptionChanged) {
+        toast({
+          title: "Informasi",
+          description: "Laporan sudah dalam Bahasa Indonesia atau tidak memerlukan terjemahan",
+          variant: "default"
+        });
+        return;
+      }
+
+      setTranslatedReports(prev => ({
+        ...prev,
+        [reportId]: {
+          title: translatedTitle,
+          description: translatedDescription,
+          originalTitle: report.title,
+          originalDescription: report.description
+        }
+      }));
+
+      // Success feedback
+      const changedParts = [];
+      if (titleChanged) changedParts.push('judul');
+      if (descriptionChanged) changedParts.push('deskripsi');
+      
+      toast({
+        title: "Berhasil",
+        description: `AI berhasil menerjemahkan ${changedParts.join(' dan ')}`,
+        variant: "default"
+      });
+
+    } catch (error) {
+      console.error('Error translating report:', error);
+      
+      // More specific error messages
+      let errorMessage = "Terjadi kesalahan saat menerjemahkan dengan AI";
+      if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage = "Gagal terhubung ke layanan AI. Periksa koneksi internet Anda.";
+      } else if (error.message.includes('quota') || error.message.includes('limit')) {
+        errorMessage = "Batas penggunaan AI tercapai. Coba lagi nanti.";
+      } else if (error.message.includes('API')) {
+        errorMessage = "Layanan AI sedang tidak tersedia. Coba lagi nanti.";
+      }
+      
+      toast({
+        title: "Gagal",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setTranslatingReports(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
+  const handleResetTranslation = (reportId) => {
+    setTranslatedReports(prev => {
+      const updated = { ...prev };
+      delete updated[reportId];
+      return updated;
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -565,6 +718,10 @@ export default function ReportsManagement() {
                   isExpanded={expandedReportId === report.id}
                   onToggleDetail={() => toggleReportDetail(report.id)}
                   onSubmitResponse={(responseText) => handleSubmitResponse(report.id, responseText)}
+                  onTranslate={() => handleTranslateReport(report.id)}
+                  onResetTranslation={() => handleResetTranslation(report.id)}
+                  translatedData={translatedReports[report.id]}
+                  isTranslating={translatingReports[report.id] || false}
                 />
               ))
             )}
@@ -583,6 +740,10 @@ export default function ReportsManagement() {
                     isExpanded={expandedReportId === report.id}
                     onToggleDetail={() => toggleReportDetail(report.id)}
                     onSubmitResponse={(responseText) => handleSubmitResponse(report.id, responseText)}
+                    onTranslate={() => handleTranslateReport(report.id)}
+                    onResetTranslation={() => handleResetTranslation(report.id)}
+                    translatedData={translatedReports[report.id]}
+                    isTranslating={translatingReports[report.id] || false}
                   />
                   <div className="absolute top-4 right-4">
                     <Button
@@ -612,6 +773,10 @@ export default function ReportsManagement() {
                   isExpanded={expandedReportId === report.id}
                   onToggleDetail={() => toggleReportDetail(report.id)}
                   onSubmitResponse={(responseText) => handleSubmitResponse(report.id, responseText)}
+                  onTranslate={() => handleTranslateReport(report.id)}
+                  onResetTranslation={() => handleResetTranslation(report.id)}
+                  translatedData={translatedReports[report.id]}
+                  isTranslating={translatingReports[report.id] || false}
                   readOnly={true}
                 />
               ))
@@ -630,6 +795,10 @@ function ExpandableReportCard({
   isExpanded, 
   onToggleDetail, 
   onSubmitResponse, 
+  onTranslate,
+  onResetTranslation,
+  translatedData,
+  isTranslating = false,
   readOnly = false 
 }) {
   const [newResponse, setNewResponse] = useState('');
@@ -711,8 +880,37 @@ function ExpandableReportCard({
     >
       <div className="flex justify-between items-start">
         <div className="flex-grow">
-          <h3 className="font-semibold text-lg">{report.title}</h3>
-          <p className="text-sm text-gray-500 line-clamp-2 md:line-clamp-none">{report.description}</p>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-semibold text-lg">
+              {translatedData ? translatedData.title : report.title}
+            </h3>
+            {translatedData && (
+              <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">
+                AI Translated
+              </span>
+            )}
+          </div>
+          
+          {translatedData && (
+            <div className="mb-2">
+              <p className="text-xs text-gray-400 mb-1">Judul asli:</p>
+              <p className="text-sm text-gray-600 italic">{translatedData.originalTitle}</p>
+            </div>
+          )}
+          
+          <p className="text-sm text-gray-500 line-clamp-2 md:line-clamp-none">
+            {translatedData ? translatedData.description : report.description}
+          </p>
+          
+          {translatedData && (
+            <div className="mt-2">
+              <p className="text-xs text-gray-400 mb-1">Deskripsi asli:</p>
+              <p className="text-sm text-gray-600 italic line-clamp-2 md:line-clamp-none">
+                {translatedData.originalDescription}
+              </p>
+            </div>
+          )}
+          
           <div className="flex flex-wrap gap-2 mt-2">
             <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
               {report.category}
@@ -725,28 +923,58 @@ function ExpandableReportCard({
             </span>
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onToggleDetail}
-          className={`transition-all duration-500 ease-in-out ml-2 whitespace-nowrap ${
-            isExpanded ? 'bg-blue-50 border-blue-300' : ''
-          }`}
-        >
-          <span className="flex items-center gap-1">
-            {isExpanded ? (
+        
+        <div className="flex flex-col gap-2 ml-2">
+          {/* Translate Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={translatedData ? onResetTranslation : onTranslate}
+            disabled={isTranslating}
+            className="whitespace-nowrap"
+          >
+            {isTranslating ? (
               <>
-                <ChevronUp className="w-4 h-4 transition-transform duration-500 ease-in-out" />
-                <span>Tutup Detail</span>
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                AI Translate...
+              </>
+            ) : translatedData ? (
+              <>
+                <X className="w-4 h-4 mr-1" />
+                Reset
               </>
             ) : (
               <>
-                <ChevronDown className="w-4 h-4 transition-transform duration-500 ease-in-out" />
-                <span>Lihat Detail</span>
+                <Languages className="w-4 h-4 mr-1" />
+                AI Translate
               </>
             )}
-          </span>
-        </Button>
+          </Button>
+          
+          {/* Detail Toggle Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onToggleDetail}
+            className={`transition-all duration-500 ease-in-out whitespace-nowrap ${
+              isExpanded ? 'bg-blue-50 border-blue-300' : ''
+            }`}
+          >
+            <span className="flex items-center gap-1">
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="w-4 h-4 transition-transform duration-500 ease-in-out" />
+                  <span>Tutup Detail</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4 transition-transform duration-500 ease-in-out" />
+                  <span>Lihat Detail</span>
+                </>
+              )}
+            </span>
+          </Button>
+        </div>
       </div>
 
       <div 

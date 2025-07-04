@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
+import { useRouter } from 'next/navigation';
 
 // Calculate days overdue from date string
 const calculateDaysOverdue = (dateString) => {
@@ -26,6 +27,7 @@ const formatDate = (dateString) => {
 
 export default function WarningsPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const [warnings, setWarnings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -245,52 +247,8 @@ export default function WarningsPage() {
     setDialogOpen(true);
   };
 
-  const handleProcessWarning = async (warning) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast({
-          title: "Error",
-          description: "Token tidak ditemukan. Silakan login terlebih dahulu.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const apiUrl = `/api/proxy?endpoint=laporan/${warning.id}`;
-      
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...warning.reportData,
-          status: "Diproses"
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      toast({
-        title: "Berhasil",
-        description: "Status laporan telah diubah menjadi 'Diproses'",
-        variant: "default"
-      });
-
-      setDialogOpen(false);
-      fetchWarnings(); // Refresh warnings
-    } catch (error) {
-      console.error('Error updating report:', error);
-      toast({
-        title: "Gagal",
-        description: `Gagal memproses laporan: ${error.message}`,
-        variant: "destructive"
-      });
-    }
+  const handleProcessWarning = (warning) => {
+    router.push(`/admin/reports?id=${warning.reportId.replace('REP-', '')}`);
   };
 
   const getPriorityStyles = (priority) => {

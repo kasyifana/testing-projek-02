@@ -12,7 +12,9 @@ import {
   ShieldAlert, // Changed from Shield
   GraduationCap,
   Wallet,
-  MoreHorizontal
+  MoreHorizontal,
+  Sparkles,
+  TrendingUp
 } from 'lucide-react';
 import { Bar, Line } from 'react-chartjs-2';
 import {
@@ -24,10 +26,11 @@ import {
   Title,
   Tooltip,
   Legend,
-  PointElement,
+  PointElement
 } from 'chart.js';
+import { createChatSession } from '@/ai/genkit';
 
-// Register ChartJS components
+// Configure ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -38,6 +41,8 @@ ChartJS.register(
   Legend,
   PointElement
 );
+
+// No client-side Genkit init
 
 export default function Dashboard() {
   const router = useRouter();
@@ -52,6 +57,9 @@ export default function Dashboard() {
   const [categoryData, setCategoryData] = useState(null);
   const [monthlyData, setMonthlyData] = useState(null);
   const [error, setError] = useState(null);
+  const [aiSummary, setAiSummary] = useState('');
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
 
   // Check authentication and authorization
   useEffect(() => {
@@ -126,13 +134,199 @@ export default function Dashboard() {
     }
   };
 
+  // Generate AI summary using createChatSession like ai-chatbot.jsx
+  const generateAiSummary = async (reports) => {
+    if (!reports || reports.length === 0) return;
+    
+    setIsSummaryLoading(true);
+    setSummaryError(null);
+    
+    try {
+      // Create report text for AI analysis with additional pattern analysis
+      const reportTexts = reports.map(r => 
+        `Judul: ${r.judul}, Deskripsi: ${r.deskripsi}, Kategori: ${r.kategori || 'N/A'}, Status: ${r.status}, Tanggal: ${r.tanggal_lapor}`
+      ).join('\n---\n');
+
+      // Analyze patterns for predictive insights
+      const patternAnalysis = analyzeReportPatterns(reports);
+
+      // Enhanced system instruction for report analysis with predictive capabilities
+      const systemInstruction = `
+        Anda adalah asisten AI yang bertugas menganalisis laporan dari platform "LaporKampus" dan memberikan insight prediktif.
+        Berdasarkan daftar laporan, berikan ringkasan eksekutif yang terstruktur dengan format berikut:
+        
+        1. **Isu Utama**: Identifikasi 2-3 masalah yang paling sering muncul
+        2. **Tren**: Jelaskan pola atau tren yang terlihat dari laporan
+        3. **Prioritas**: Sebutkan kategori yang memerlukan perhatian segera
+        4. **Prediksi & Rekomendasi**: Berikan prediksi masa depan dan rekomendasi tindakan berdasarkan pola yang terdeteksi
+        
+        Untuk bagian Prediksi & Rekomendasi, gunakan panduan berikut:
+        - AC/Pendingin rusak ≥3x: Sarankan service rutin atau penggantian
+        - Kursi/Meja rusak ≥2x: Sarankan penggantian furniture
+        - Toilet/Kamar mandi bermasalah ≥3x: Sarankan renovasi atau perbaikan sistem
+        - Proyektor/LCD rusak ≥2x: Sarankan upgrade teknologi
+        - WiFi/Internet bermasalah ≥4x: Sarankan upgrade infrastruktur jaringan
+        - Lampu rusak ≥3x: Sarankan penggantian sistem penerangan
+        - Pintu/Jendela rusak ≥2x: Sarankan renovasi struktural
+        
+        Gunakan format:
+        - **Teks Tebal** untuk judul/poin penting
+        - Bullet points (- ) untuk daftar
+        - Gunakan Bahasa Indonesia yang formal namun mudah dipahami
+        - Berikan estimasi waktu dan biaya jika memungkinkan
+        
+        Fokus pada insight yang actionable untuk manajemen kampus.
+      `;
+
+      // Create chat session with enhanced system instruction
+      const chat = await createChatSession([], systemInstruction);
+      
+      // Send the reports data for analysis with pattern insights
+      const prompt = `Analisis laporan berikut dan berikan ringkasan eksekutif dengan prediksi masa depan:
+
+DATA LAPORAN:
+${reportTexts}
+
+ANALISIS POLA TERDETEKSI:
+${patternAnalysis}
+
+Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk mencegah masalah berulang.`;
+
+      const aiResponse = await chat.sendMessage(prompt);
+      setAiSummary(aiResponse);
+      
+    } catch (error) {
+      console.error('Error generating AI summary:', error);
+      setSummaryError('Gagal menghasilkan ringkasan AI. Silakan coba lagi nanti.');
+    } finally {
+      setIsSummaryLoading(false);
+    }
+  };
+
+  // Function to analyze report patterns for predictive insights
+  const analyzeReportPatterns = (reports) => {
+    const patterns = {
+      facility: {},
+      location: {},
+      timePattern: {},
+      repeatIssues: {}
+    };
+
+    reports.forEach(report => {
+      const title = report.judul?.toLowerCase() || '';
+      const description = report.deskripsi?.toLowerCase() || '';
+      const category = report.kategori?.toLowerCase() || '';
+      const fullText = `${title} ${description}`;
+
+      // Analyze facility-specific issues
+      const facilityKeywords = {
+        'ac': ['ac', 'air conditioner', 'pendingin', 'kondisi udara'],
+        'kursi': ['kursi', 'chair', 'tempat duduk'],
+        'meja': ['meja', 'table', 'desk'],
+        'toilet': ['toilet', 'wc', 'kamar mandi', 'bathroom'],
+        'proyektor': ['proyektor', 'projector', 'lcd'],
+        'wifi': ['wifi', 'internet', 'jaringan', 'network'],
+        'lampu': ['lampu', 'light', 'penerangan'],
+        'pintu': ['pintu', 'door'],
+        'jendela': ['jendela', 'window']
+      };
+
+      Object.keys(facilityKeywords).forEach(facility => {
+        const keywords = facilityKeywords[facility];
+        if (keywords.some(keyword => fullText.includes(keyword))) {
+          patterns.facility[facility] = (patterns.facility[facility] || 0) + 1;
+        }
+      });
+
+      // Analyze location patterns
+      const locationKeywords = ['ruang', 'kelas', 'lab', 'kantin', 'perpustakaan', 'aula'];
+      locationKeywords.forEach(loc => {
+        if (fullText.includes(loc)) {
+          patterns.location[loc] = (patterns.location[loc] || 0) + 1;
+        }
+      });
+
+      // Analyze time patterns
+      if (report.tanggal_lapor) {
+        const month = new Date(report.tanggal_lapor).getMonth();
+        patterns.timePattern[month] = (patterns.timePattern[month] || 0) + 1;
+      }
+    });
+
+    // Generate pattern summary
+    let analysisText = "POLA YANG TERDETEKSI:\n\n";
+    
+    // Facility issues analysis
+    analysisText += "** Masalah Fasilitas Berulang **\n";
+    Object.entries(patterns.facility).forEach(([facility, count]) => {
+      if (count >= 2) {
+        let recommendation = "";
+        switch(facility) {
+          case 'ac':
+            recommendation = count >= 3 ? "URGENT: Perlu service rutin atau penggantian unit" : "Perlu perhatian khusus";
+            break;
+          case 'kursi':
+          case 'meja':
+            recommendation = count >= 2 ? "REKOMENDASI: Penggantian furniture" : "Monitor kondisi";
+            break;
+          case 'toilet':
+            recommendation = count >= 3 ? "URGENT: Renovasi atau perbaikan sistem" : "Perlu perbaikan";
+            break;
+          case 'proyektor':
+            recommendation = count >= 2 ? "REKOMENDASI: Upgrade teknologi" : "Perawatan rutin";
+            break;
+          case 'wifi':
+            recommendation = count >= 4 ? "URGENT: Upgrade infrastruktur jaringan" : "Periksa koneksi";
+            break;
+          case 'lampu':
+            recommendation = count >= 3 ? "REKOMENDASI: Penggantian sistem penerangan" : "Perawatan rutin";
+            break;
+          case 'pintu':
+          case 'jendela':
+            recommendation = count >= 2 ? "REKOMENDASI: Renovasi struktural" : "Perbaikan minor";
+            break;
+        }
+        analysisText += `- ${facility.toUpperCase()}: ${count} laporan → ${recommendation}\n`;
+      }
+    });
+
+    // Location hotspots
+    analysisText += "\n** Lokasi Bermasalah **\n";
+    Object.entries(patterns.location)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3)
+      .forEach(([location, count]) => {
+        analysisText += `- ${location.toUpperCase()}: ${count} laporan\n`;
+      });
+
+    return analysisText;
+  };
+
   const processDashboardData = (reports, users) => {
     // 1. Process Stats
     const totalReports = reports.length;
     const completedReports = reports.filter(r => r.status === 'Selesai').length;
     const inProgressReports = reports.filter(r => r.status === 'In Progress' || r.status === 'Pending').length;
-    const totalUsers = users.length;
-    setStats({ totalReports, completedReports, inProgressReports, totalUsers });
+    
+    // Count unique user_ids
+    const uniqueUserIds = new Set();
+    reports.forEach(report => {
+      if (report.user_id) {
+        uniqueUserIds.add(report.user_id);
+      }
+    });
+    
+    const totalUniqueUsers = uniqueUserIds.size;
+    
+    setStats({ 
+      totalReports, 
+      completedReports, 
+      inProgressReports, 
+      totalUsers: totalUniqueUsers
+    });
+
+    // Call AI summary generator with reports data
+    generateAiSummary(reports);
 
     // 2. Process Category Data
     const categoriesCount = reports.reduce((acc, report) => {
@@ -313,6 +507,60 @@ export default function Dashboard() {
           }} /> : <p>Loading chart data...</p>}
         </Card>
       </div>
+
+      {/* AI Summary */}
+      <h2 className="flex items-center gap-2 text-xl font-semibold mt-8">
+        <Sparkles className="w-5 h-5 text-purple-500" />
+        <TrendingUp className="w-5 h-5 text-blue-500" />
+        Ringkasan Eksekutif AI & Prediksi Masa Depan
+      </h2>
+      <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200">
+        {isSummaryLoading && (
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+            <p className="text-purple-800">AI sedang menganalisis laporan dan memprediksi tren masa depan...</p>
+          </div>
+        )}
+        {summaryError && (
+          <div className="text-red-700 bg-red-100 p-3 rounded-lg">
+            <p><strong>Gagal mendapatkan ringkasan AI:</strong> {summaryError}</p>
+          </div>
+        )}
+        {aiSummary && !isSummaryLoading && (
+          <div>
+            <h3 className="text-lg font-semibold mb-2 text-purple-900 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              Analisis Tren & Prediksi Masa Depan
+            </h3>
+            <div 
+              className="text-gray-800 prose prose-sm max-w-none"
+              style={{
+                lineHeight: '1.6',
+                letterSpacing: '0.01em'
+              }}
+              dangerouslySetInnerHTML={{ 
+                __html: aiSummary
+                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\n- /g, '<br/>• ')
+                  .replace(/\n\d+\. /g, '<br/>$&')
+                  .replace(/\n/g, '<br/>')
+                  .replace(/URGENT:/g, '<span class="text-red-600 font-bold">🚨 URGENT:</span>')
+                  .replace(/REKOMENDASI:/g, '<span class="text-orange-600 font-bold">💡 REKOMENDASI:</span>')
+              }}
+            />
+            <div className="mt-4 p-3 bg-blue-100 rounded-lg border-l-4 border-blue-500">
+              <p className="text-sm text-blue-800">
+                <TrendingUp className="w-4 h-4 inline mr-1" />
+                <strong>Catatan:</strong> Prediksi berdasarkan analisis pola historis laporan. 
+                Tindakan preventif direkomendasikan untuk mengurangi keluhan berulang.
+              </p>
+            </div>
+          </div>
+        )}
+        {!isSummaryLoading && !aiSummary && !summaryError && (
+            <p className="text-gray-500">Ringkasan dan prediksi akan muncul di sini setelah laporan dianalisis.</p>
+        )}
+      </Card>
     </div>
   );
 }
