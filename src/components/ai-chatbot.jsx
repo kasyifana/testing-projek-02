@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Send, Loader2 } from 'lucide-react';
-import { createChatSession } from '@/ai/genkit';
+import { createChatSession } from '@/ai/groq';
 
 // Konstanta untuk instruksi sistem yang mendefinisikan persona dan tugas chatbot
 const SYSTEM_INSTRUCTION = `
@@ -76,7 +76,7 @@ export function ChatBot() {
         { role: 'model', content: aiResponse }
       ]);
     } catch (error) {
-      console.error('Error communicating with Gemini API:', error);
+      console.error('Error communicating with Groq API:', error);
       setMessages([
         ...updatedMessages,
         { 

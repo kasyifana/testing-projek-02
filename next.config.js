@@ -17,7 +17,9 @@ const nextConfig = {
     ],
   },
   env: {
-    NEXT_PUBLIC_GEMINI_API_KEY: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+    NEXT_PUBLIC_GROQ_API_KEY: process.env.NEXT_PUBLIC_GROQ_API_KEY,
+    NEXT_PUBLIC_GROQ_API_URL: process.env.NEXT_PUBLIC_GROQ_API_URL,
+    NEXT_PUBLIC_GROQ_MODEL: process.env.NEXT_PUBLIC_GROQ_MODEL,
   },
   // Configure webpack to handle browser-only dependencies
   webpack: (config, { isServer }) => {

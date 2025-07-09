@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Trash2, Sparkles } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { createChatSession } from "@/ai/genkit";
+import { createChatSession } from "@/ai/groq";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -120,7 +120,7 @@ export default function FeedbackPage() {
     } finally {
       setIsLoading(false);
     }
-  };  // Generate AI response with Gemini
+  };  // Generate AI response with Groq
   const handleGenerateAIResponse = async (feedback) => {
     if (!feedback) return;
     

@@ -7,8 +7,60 @@ import Link from 'next/link';
 import { LogIn } from 'lucide-react';
 import { LoginDialog } from '@/components/auth/LoginDialog';
 import Lottie from 'lottie-react';
-import { InfoBoxes } from './InfoBoxes';
 import { motion } from 'framer-motion';
+
+// Custom Typing Effect Component for Multiple Words
+function TypingEffect({ words = [], speed = 100, delay = 0, loop = true }) {
+  const [displayText, setDisplayText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false);
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+
+  useEffect(() => {
+    if (!words || words.length === 0) return;
+
+    const currentWord = words[currentWordIndex];
+
+    const timeout = setTimeout(() => {
+      if (isWaiting) {
+        setIsWaiting(false);
+        if (loop) {
+          setIsDeleting(true);
+        }
+        return;
+      }
+
+      if (!isDeleting && currentIndex < currentWord.length) {
+        // Typing
+        setDisplayText(currentWord.slice(0, currentIndex + 1));
+        setCurrentIndex(currentIndex + 1);
+      } else if (isDeleting && currentIndex > 0) {
+        // Deleting
+        setDisplayText(currentWord.slice(0, currentIndex - 1));
+        setCurrentIndex(currentIndex - 1);
+      } else if (!isDeleting && currentIndex === currentWord.length) {
+        // Finished typing, wait before deleting
+        if (loop) {
+          setIsWaiting(true);
+        }
+      } else if (isDeleting && currentIndex === 0) {
+        // Finished deleting, move to next word and start typing again
+        setIsDeleting(false);
+        setCurrentWordIndex((prevIndex) => (prevIndex + 1) % words.length);
+      }
+    }, isWaiting ? 2000 : isDeleting ? speed / 2 : speed);
+
+    return () => clearTimeout(timeout);
+  }, [words, speed, currentIndex, isDeleting, isWaiting, loop, currentWordIndex]);
+
+  return (
+    <span>
+      {displayText}
+      <span className="animate-pulse">|</span>
+    </span>
+  );
+}
 
 export function HeroSection() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -64,7 +116,14 @@ export function HeroSection() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="mt-6 max-w-3xl mx-auto md:mx-0 text-lg sm:text-xl md:text-2xl text-foreground"
             >
-              Sampaikan Aspirasi, Wujudkan Kampus Ideal.
+              Sampaikan Aspirasi, Wujudkan Kampus Ideal. <span className="text-accent font-semibold">
+                <TypingEffect 
+                  words={["Cepat", "Efektif", "Gratis"]} 
+                  speed={60} 
+                  delay={250} 
+                  loop={true} 
+                />
+              </span>
             </motion.p>
             
             <motion.p 
@@ -90,9 +149,6 @@ export function HeroSection() {
                 <Link href="#visi-misi">Pelajari Lebih Lanjut</Link>
               </Button>
             </motion.div>
-
-            {/* Add the InfoBoxes component here */}
-            <InfoBoxes />
           </div>
 
           <div className={`md:w-2/5 ${isMobile ? 'mt-10' : ''}`}>

@@ -694,18 +694,6 @@ Hasil terjemahan:`;
       expertise: ["komputer", "laptop", "internet", "wifi", "network", "IT", "sistem", "software", "hardware"],
       whatsapp: "6281234567895",
       position: "IT Support"
-    },
-    {
-      name: "Bu Ratna",
-      expertise: ["layanan", "administrasi", "akademik", "keuangan", "pendaftaran", "surat", "berkas", "dokumen", "service", "pelayanan"],
-      whatsapp: "6281234567896",
-      position: "Supervisor Layanan Akademik"
-    },
-    {
-      name: "Pak Deni",
-      expertise: ["kekerasan", "bullying", "harassment", "pelecehan", "intimidasi", "keamanan", "security", "violence", "abuse", "diskriminasi"],
-      whatsapp: "6281234567897",
-      position: "Koordinator Keamanan & Anti-Kekerasan"
     }
   ];
 
@@ -1219,12 +1207,12 @@ function ExpandableReportCard({
               {isMatching ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  Melaporkan...
+                  AI Matching...
                 </>
               ) : (
                 <>
                   <AlertCircle className="w-4 h-4 mr-1" />
-                  Laporkan
+                  AI Match
                 </>
               )}
             </Button>

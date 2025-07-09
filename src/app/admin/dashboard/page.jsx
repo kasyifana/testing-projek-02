@@ -28,7 +28,7 @@ import {
   Legend,
   PointElement
 } from 'chart.js';
-import { createChatSession } from '@/ai/genkit';
+import { createChatSession } from '@/ai/groq';
 
 // Configure ChartJS components
 ChartJS.register(

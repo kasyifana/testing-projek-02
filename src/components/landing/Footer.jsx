@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { MessageSquareWarning, Facebook, Twitter, Instagram } from 'lucide-react';
+import Image from 'next/image';
+import { Facebook, Twitter, Instagram } from 'lucide-react';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -10,7 +11,13 @@ export function Footer() {
         <div className="grid md:grid-cols-3 gap-8">
           <div>
             <Link href="/" className="flex items-center gap-2 mb-4 text-primary">
-              <MessageSquareWarning className="h-8 w-8" />
+              <Image 
+                src="/LogoLaporKampus.png" 
+                alt="Logo Lapor Kampus" 
+                width={32} 
+                height={32} 
+                className="h-8 w-8"
+              />
               <span className="text-2xl font-bold">Lapor Kampus</span>
             </Link>
             <p className="text-sm text-muted-foreground">

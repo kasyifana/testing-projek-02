@@ -1,9 +1,5 @@
-import { generate } from '@genkit-ai/ai';
-import { configureGenkit } from '@/ai/genkit';
+import { generateSummary } from '@/ai/groq';
 import { NextResponse } from 'next/server';
-
-// Configure Genkit
-configureGenkit();
 
 export async function POST(request) {
   try {
@@ -86,15 +82,7 @@ export async function POST(request) {
       Ringkasan Eksekutif:
     `;
 
-    const llmResponse = await generate({
-      prompt: prompt,
-      model: 'google-ai/gemini-1.5-flash-latest',
-      config: {
-        temperature: 0.5,
-      },
-    });
-
-    const summary = llmResponse.text();
+    const summary = await generateSummary(prompt);
 
     return NextResponse.json({ summary });
 
