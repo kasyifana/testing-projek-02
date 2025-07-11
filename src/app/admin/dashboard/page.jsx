@@ -14,9 +14,11 @@ import {
   Wallet,
   MoreHorizontal,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  UserCheck,
+  Settings
 } from 'lucide-react';
-import { Bar, Line } from 'react-chartjs-2';
+import { Bar, Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -26,7 +28,8 @@ import {
   Title,
   Tooltip,
   Legend,
-  PointElement
+  PointElement,
+  ArcElement
 } from 'chart.js';
 import { createChatSession } from '@/ai/groq';
 
@@ -39,7 +42,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  PointElement
+  PointElement,
+  ArcElement
 );
 
 // No client-side Genkit init
@@ -56,6 +60,8 @@ export default function Dashboard() {
   });
   const [categoryData, setCategoryData] = useState(null);
   const [monthlyData, setMonthlyData] = useState(null);
+  const [personnelData, setPersonnelData] = useState(null);
+  const [activeUsersData, setActiveUsersData] = useState(null);
   const [error, setError] = useState(null);
   const [aiSummary, setAiSummary] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
@@ -203,6 +209,74 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
     }
   };
 
+  // Database of personnel with their expertise - same as in reports page
+  const personnelDatabase = [
+    {
+      name: "Pak Budi",
+      expertise: ["AC", "pendingin", "cooling", "air conditioner", "hvac", "suhu", "dingin", "panas"],
+      position: "Teknisi AC & Cooling System"
+    },
+    {
+      name: "Bu Sari",
+      expertise: ["listrik", "lampu", "kabel", "electricity", "electrical", "power", "daya", "korsleting", "mati lampu"],
+      position: "Teknisi Listrik"
+    },
+    {
+      name: "Pak Joko",
+      expertise: ["toilet", "wc", "kamar mandi", "air", "pipa", "kran", "bocor", "mampet", "saluran", "plumbing"],
+      position: "Teknisi Plumbing"
+    },
+    {
+      name: "Bu Maya",
+      expertise: ["kebersihan", "sampah", "kotor", "cleaning", "janitor", "bersih", "sanitasi", "hygiene"],
+      position: "Supervisor Kebersihan"
+    },
+    {
+      name: "Pak Andi",
+      expertise: ["pintu", "jendela", "kunci", "rusak", "patah", "maintenance", "perbaikan", "carpentry"],
+      position: "Teknisi Maintenance Umum"
+    },
+    {
+      name: "Bu Lina",
+      expertise: ["komputer", "laptop", "internet", "wifi", "network", "IT", "sistem", "software", "hardware"],
+      position: "IT Support"
+    },
+    {
+      name: "Bu Ratna",
+      expertise: ["layanan", "administrasi", "akademik", "keuangan", "pendaftaran", "surat", "berkas", "dokumen", "service", "pelayanan"],
+      position: "Supervisor Layanan Akademik"
+    },
+    {
+      name: "Pak Deni",
+      expertise: ["kekerasan", "bullying", "harassment", "pelecehan", "intimidasi", "keamanan", "security", "violence", "abuse", "diskriminasi"],
+      position: "Koordinator Keamanan & Anti-Kekerasan"
+    }
+  ];
+
+  // Function to match reports to personnel based on keywords
+  const matchReportToPersonnel = (report) => {
+    const reportText = `${report.judul} ${report.deskripsi}`.toLowerCase();
+    let bestMatch = null;
+    let highestScore = 0;
+
+    personnelDatabase.forEach(person => {
+      let score = 0;
+      person.expertise.forEach(keyword => {
+        if (reportText.includes(keyword.toLowerCase())) {
+          score++;
+        }
+      });
+      
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = person;
+      }
+    });
+
+    // If no match found, assign to general maintenance
+    return bestMatch || personnelDatabase.find(p => p.name === "Pak Andi");
+  };
+
   // Function to analyze report patterns for predictive insights
   const analyzeReportPatterns = (reports) => {
     const patterns = {
@@ -341,13 +415,22 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
         label: 'Jumlah Laporan',
         data: Object.values(categoriesCount),
         backgroundColor: [
-          'rgba(255, 99, 132, 0.5)',
-          'rgba(54, 162, 235, 0.5)',
-          'rgba(255, 206, 86, 0.5)',
-          'rgba(75, 192, 192, 0.5)',
-          'rgba(153, 102, 255, 0.5)',
-          'rgba(255, 159, 64, 0.5)',
+          'rgba(255, 99, 132, 0.8)',
+          'rgba(54, 162, 235, 0.8)',
+          'rgba(255, 206, 86, 0.8)',
+          'rgba(75, 192, 192, 0.8)',
+          'rgba(153, 102, 255, 0.8)',
+          'rgba(255, 159, 64, 0.8)',
         ],
+        borderColor: [
+          'rgba(255, 99, 132, 1)',
+          'rgba(54, 162, 235, 1)',
+          'rgba(255, 206, 86, 1)',
+          'rgba(75, 192, 192, 1)',
+          'rgba(153, 102, 255, 1)',
+          'rgba(255, 159, 64, 1)',
+        ],
+        borderWidth: 2,
       }],
     });
 
@@ -384,6 +467,78 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
         },
       ],
     });
+
+    // 4. Process Personnel Data - Match reports to personnel based on keywords
+    const personnelCount = {};
+    
+    // Initialize all personnel with 0 count
+    personnelDatabase.forEach(person => {
+      personnelCount[person.name] = 0;
+    });
+    
+    // Match reports to personnel based on content
+    reports.forEach(report => {
+      const assignedPersonnel = matchReportToPersonnel(report);
+      if (assignedPersonnel) {
+        personnelCount[assignedPersonnel.name]++;
+      }
+    });
+
+    // Sort personnel by count (descending)
+    const sortedPersonnel = Object.entries(personnelCount)
+      .sort(([,a], [,b]) => b - a)
+      .filter(([,count]) => count > 0); // Only show personnel with reports
+
+    setPersonnelData({
+      labels: sortedPersonnel.map(([name]) => name),
+      datasets: [{
+        label: 'Jumlah Laporan Ditangani',
+        data: sortedPersonnel.map(([,count]) => count),
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.8)',
+          'rgba(54, 162, 235, 0.8)',
+          'rgba(255, 206, 86, 0.8)',
+          'rgba(75, 192, 192, 0.8)',
+          'rgba(153, 102, 255, 0.8)',
+          'rgba(255, 159, 64, 0.8)',
+          'rgba(199, 199, 199, 0.8)',
+          'rgba(83, 102, 255, 0.8)',
+        ],
+      }],
+    });
+
+    // 5. Process Active Users Data - Count reports per user
+    const userReportCount = {};
+    
+    reports.forEach(report => {
+      const userName = report.nama_pelapor || 'Unknown User';
+      userReportCount[userName] = (userReportCount[userName] || 0) + 1;
+    });
+
+    // Sort users by report count (descending) and take top 10
+    const sortedUsers = Object.entries(userReportCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10); // Top 10 most active users
+
+    setActiveUsersData({
+      labels: sortedUsers.map(([name]) => name),
+      datasets: [{
+        label: 'Jumlah Laporan Dibuat',
+        data: sortedUsers.map(([,count]) => count),
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(59, 130, 246, 0.8)',
+          'rgba(239, 68, 68, 0.8)',
+          'rgba(245, 158, 11, 0.8)',
+          'rgba(168, 85, 247, 0.8)',
+          'rgba(236, 72, 153, 0.8)',
+          'rgba(14, 165, 233, 0.8)',
+          'rgba(16, 185, 129, 0.8)',
+          'rgba(251, 146, 60, 0.8)',
+          'rgba(139, 92, 246, 0.8)',
+        ],
+      }],
+    });
   };
 
   if (isLoading) {
@@ -400,14 +555,6 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
   if (!isAuthorized) {
     return null; // Will redirect, so don't render anything
   }
-
-  // Kategori Isu - Disesuaikan dengan kategori dari database
-  const staticCategories = [
-    { dbKey: 'fasilitas', title: 'Fasilitas', icon: Wrench, color: 'orange' },
-    { dbKey: 'layanan', title: 'Layanan', icon: Users, color: 'blue' },
-    { dbKey: 'kekerasan', title: 'Kekerasan', icon: ShieldAlert, color: 'red' },
-    { dbKey: 'lainnya', title: 'Lainnya', icon: MoreHorizontal, color: 'gray' },
-  ];
 
   return (
     <div className="space-y-6">
@@ -463,29 +610,6 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
         </Card>
       </div>
 
-      {/* Kategori Isu */}
-      <h2 className="text-xl font-semibold mt-8">Kategori Isu</h2>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {staticCategories.map((category, index) => {
-          const Icon = category.icon;
-          // Match using dbKey to get the correct count from processed data
-          const count = categoryData?.labels.includes(category.dbKey) 
-            ? categoryData.datasets[0].data[categoryData.labels.indexOf(category.dbKey)] 
-            : 0;
-          return (
-            <Card key={index} className="p-6">
-              <div className="flex flex-col items-center text-center">
-                <div className={`p-3 bg-${category.color}-100 rounded-lg mb-3`}>
-                  <Icon className={`w-6 h-6 text-${category.color}-600`} />
-                </div>
-                <h3 className="font-medium">{category.title}</h3>
-                <p className="text-2xl font-bold mt-2">{count}</p>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
       {/* Grafik Statistik */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         <Card className="p-6">
@@ -499,10 +623,68 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
         </Card>
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Distribusi Kategori</h3>
-          {categoryData ? <Bar data={categoryData} options={{
+          {categoryData ? <Pie data={categoryData} options={{
+            responsive: true,
+            plugins: {
+              legend: { 
+                position: 'bottom',
+                labels: {
+                  padding: 20,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const label = context.label || '';
+                    const value = context.parsed || 0;
+                    const total = context.dataset.data.reduce((acc, data) => acc + data, 0);
+                    const percentage = ((value / total) * 100).toFixed(1);
+                    return `${label}: ${value} (${percentage}%)`;
+                  }
+                }
+              }
+            },
+            maintainAspectRatio: true,
+          }} /> : <p>Loading chart data...</p>}
+        </Card>
+      </div>
+
+      {/* Grafik Personel dan Pengguna Aktif */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Personel Penanganan Laporan</h3>
+          <p className="text-sm text-gray-600 mb-4">Jumlah laporan yang ditangani oleh setiap personel berdasarkan kategori masalah</p>
+          {personnelData ? <Bar data={personnelData} options={{
             responsive: true,
             plugins: {
               legend: { position: 'bottom' }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  stepSize: 1
+                }
+              }
+            }
+          }} /> : <p>Loading chart data...</p>}
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Pengguna Paling Aktif</h3>
+          <p className="text-sm text-gray-600 mb-4">Top 10 pengguna yang paling sering melaporkan masalah</p>
+          {activeUsersData ? <Bar data={activeUsersData} options={{
+            responsive: true,
+            plugins: {
+              legend: { position: 'bottom' }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  stepSize: 1
+                }
+              }
             }
           }} /> : <p>Loading chart data...</p>}
         </Card>

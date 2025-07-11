@@ -1128,6 +1128,31 @@ function ExpandableReportCard({
                 AI Translated
               </span>
             )}
+            {/* Translate Button next to title */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={translatedData ? onResetTranslation : onTranslate}
+              disabled={isTranslating}
+              className="h-6 px-2 text-xs"
+            >
+              {isTranslating ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  Translating...
+                </>
+              ) : translatedData ? (
+                <>
+                  <X className="w-3 h-3 mr-1" />
+                  Reset
+                </>
+              ) : (
+                <>
+                  <Languages className="w-3 h-3 mr-1" />
+                  Translate
+                </>
+              )}
+            </Button>
           </div>
           
           {translatedData && (
@@ -1181,32 +1206,6 @@ function ExpandableReportCard({
         </div>
         
         <div className="flex flex-col gap-2 ml-2">
-          {/* Translate Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={translatedData ? onResetTranslation : onTranslate}
-            disabled={isTranslating}
-            className="whitespace-nowrap"
-          >
-            {isTranslating ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                AI Translate...
-              </>
-            ) : translatedData ? (
-              <>
-                <X className="w-4 h-4 mr-1" />
-                Reset
-              </>
-            ) : (
-              <>
-                <Languages className="w-4 h-4 mr-1" />
-                AI Translate
-              </>
-            )}
-          </Button>
-
           {/* AI Matching Button - Only for inProgress reports */}
           {showAIMatching && (
             <Button
@@ -1240,18 +1239,6 @@ function ExpandableReportCard({
             >
               <MessageCircle className="w-4 h-4 mr-1" />
               Kirim WA
-            </Button>
-          )}
-          
-          {/* Resolve Button for In Progress reports */}
-          {showResolveButton && onResolve && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onResolve}
-              className="bg-green-100 text-green-600 hover:bg-green-200 border border-green-200 whitespace-nowrap"
-            >
-              <CheckCircle className="w-4 h-4 mr-1" /> Tandai Selesai
             </Button>
           )}
           
@@ -1425,7 +1412,18 @@ function ExpandableReportCard({
                   />
                 </div>
                 
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  {/* Resolve Button for In Progress reports - moved to detail section */}
+                  {showResolveButton && onResolve && (
+                    <Button
+                      variant="secondary"
+                      onClick={onResolve}
+                      className="bg-green-100 text-green-600 hover:bg-green-200 border border-green-200 h-10 text-base"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" /> Tandai Selesai
+                    </Button>
+                  )}
+                  
                   <Button 
                     onClick={handleSubmit}
                     className="transition-all hover:bg-blue-600 active:scale-95 h-10 text-base"

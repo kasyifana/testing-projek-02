@@ -12,7 +12,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Loader2, Trash2, Sparkles } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { createChatSession } from "@/ai/groq";
 import {
   AlertDialog,
@@ -58,7 +58,24 @@ export default function FeedbackPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [generatingAIFor, setGeneratingAIFor] = useState(null); // ID feedback yang sedang di-generate AI
+  const [autoResponseEnabled, setAutoResponseEnabled] = useState(false);
+  const [autoResponseTemplate, setAutoResponseTemplate] = useState("");
+  const [autoResponseQueue, setAutoResponseQueue] = useState([]); // Queue untuk auto response
+  const [processingAutoResponse, setProcessingAutoResponse] = useState(false);
   const { toast } = useToast();
+
+  // Load auto response settings from localStorage
+  useEffect(() => {
+    const savedAutoResponse = localStorage.getItem('autoResponseEnabled');
+    const savedTemplate = localStorage.getItem('autoResponseTemplate');
+    
+    if (savedAutoResponse !== null) {
+      setAutoResponseEnabled(JSON.parse(savedAutoResponse));
+    }
+    if (savedTemplate) {
+      setAutoResponseTemplate(savedTemplate);
+    }
+  }, []);
   
   // Helper function untuk mendapatkan authorization header
   const getAuthHeaders = () => {
@@ -73,7 +90,118 @@ export default function FeedbackPage() {
   // Fetch feedback data
   useEffect(() => {
     fetchFeedbackData();
-  }, [statusFilter]);
+  }, [statusFilter, autoResponseEnabled]);
+
+  // Auto respond to new feedback without responses
+  const autoRespondToFeedback = async (feedback) => {
+    if (!autoResponseEnabled || feedback.balasan) return;
+    
+    try {
+      let aiResponse = '';
+      
+      // Try to generate AI response first
+      if (autoResponseTemplate) {
+        try {
+          const prompt = `
+            Kamu adalah admin dari platform LaporKampus yang bertugas memberikan balasan untuk feedback dari pengguna.
+            
+            Gunakan template berikut sebagai panduan, tapi sesuaikan dengan konteks feedback:
+            "${autoResponseTemplate}"
+            
+            Berikut adalah detail feedback:
+            - Judul: ${feedback.title || 'Tidak ada judul'}
+            - Deskripsi: ${feedback.komentar || feedback.description || 'Tidak ada deskripsi'}
+            - Dari: Pengguna #${feedback.user_id || 'Anonim'}
+            
+            Berikan balasan yang sopan, profesional, dan menunjukkan empati.
+            Respon harus dalam Bahasa Indonesia.
+            Jangan melebihi 5 kalimat.
+            Sesuaikan dengan konteks feedback yang diberikan.
+          `;
+
+          const chatSession = await createChatSession();
+          aiResponse = await chatSession.sendMessage(prompt);
+        } catch (error) {
+          console.error('Error generating AI response:', error);
+          
+          // Check if it's a rate limit error
+          if (error.message.includes('429') || error.message.includes('rate limit')) {
+            toast({
+              title: "Rate Limit AI Tercapai",
+              description: "Menggunakan template default untuk balasan otomatis",
+              variant: "destructive",
+            });
+          }
+          
+          // Fallback to template if AI fails
+          aiResponse = autoResponseTemplate;
+        }
+      } else {
+        // Use default template if no custom template is set
+        aiResponse = "Terima kasih atas feedback Anda. Kami akan meninjau dan merespons secepatnya.";
+      }
+
+      // Send the auto response
+      const response = await fetch(`http://127.0.0.1:8000/api/admin/feedback/${feedback.id}/reply`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          balasan: aiResponse
+        }),
+      });
+
+      if (response.ok) {
+        console.log(`Auto response sent for feedback ${feedback.id}`);
+        
+        // Update local state
+        setFeedbackData(prev => prev.map(item => 
+          item.id === feedback.id 
+            ? { ...item, balasan: aiResponse, updated_at: new Date().toISOString() }
+            : item
+        ));
+        
+        toast({
+          title: "Balasan Otomatis Terkirim",
+          description: `Feedback "${feedback.title}" telah dijawab otomatis`,
+          variant: "success",
+        });
+      }
+    } catch (error) {
+      console.error('Error sending auto response:', error);
+      toast({
+        title: "Gagal Mengirim Balasan Otomatis",
+        description: "Silakan coba lagi nanti atau balas manual",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Process auto response queue with rate limiting
+  const processAutoResponseQueue = async (feedbackList) => {
+    if (processingAutoResponse || !autoResponseEnabled) return;
+    
+    const unrespondedFeedback = feedbackList.filter(feedback => !feedback.balasan);
+    if (unrespondedFeedback.length === 0) return;
+    
+    setProcessingAutoResponse(true);
+    
+    try {
+      for (let i = 0; i < unrespondedFeedback.length; i++) {
+        const feedback = unrespondedFeedback[i];
+        
+        // Add delay between requests to avoid rate limiting
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+        }
+        
+        await autoRespondToFeedback(feedback);
+      }
+    } catch (error) {
+      console.error('Error processing auto response queue:', error);
+    } finally {
+      setProcessingAutoResponse(false);
+    }
+  };
   
   const fetchFeedbackData = async () => {
     setIsLoading(true);
@@ -108,6 +236,12 @@ export default function FeedbackPage() {
       console.log('Feedback data fetched:', feedbacks);
       
       setFeedbackData(feedbacks);
+      
+      // Auto respond to feedback without responses if auto response is enabled
+      if (autoResponseEnabled) {
+        // Use the new queue processing function with rate limiting
+        processAutoResponseQueue(feedbacks);
+      }
     } catch (error) {
       console.error('Error fetching feedback data:', error);
       toast({
@@ -162,11 +296,28 @@ export default function FeedbackPage() {
       });
     } catch (error) {
       console.error('Error generating AI response:', error);
-      toast({
-        title: "Gagal membuat balasan AI",
-        description: "Silakan coba lagi nanti atau buat balasan manual",
-        variant: "destructive",
-      });
+      
+      // Check if it's a rate limit error
+      if (error.message.includes('429') || error.message.includes('rate limit')) {
+        toast({
+          title: "Rate Limit AI Tercapai",
+          description: "Silakan tunggu beberapa menit sebelum mencoba lagi atau gunakan template manual",
+          variant: "destructive",
+        });
+        
+        // Provide fallback template
+        const fallbackTemplate = autoResponseTemplate || "Terima kasih atas feedback Anda. Kami akan meninjau dan merespons secepatnya.";
+        setResponseValues(prev => ({
+          ...prev,
+          [feedback.id]: fallbackTemplate
+        }));
+      } else {
+        toast({
+          title: "Gagal membuat balasan AI",
+          description: "Silakan coba lagi nanti atau buat balasan manual",
+          variant: "destructive",
+        });
+      }
     } finally {
       setGeneratingAIFor(null);
     }
@@ -290,7 +441,19 @@ export default function FeedbackPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Manajemen Feedback</h1>        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <div>
+          <h1 className="text-3xl font-bold">Manajemen Feedback</h1>
+          {autoResponseEnabled && (
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-green-600 font-medium">
+                Auto Response Aktif
+                {processingAutoResponse && " - Sedang Memproses..."}
+              </span>
+            </div>
+          )}
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter Status" />
           </SelectTrigger>
@@ -399,7 +562,22 @@ export default function FeedbackPage() {
                 
                 {/* Form respon hanya muncul jika belum ada balasan atau sedang dalam mode edit */}
                 {(!feedback.balasan || selectedFeedback === feedback.id) && (
-                  <div className="space-y-2">                    <Textarea 
+                  <div className="space-y-2">
+                    {/* Show auto response status */}
+                    {!feedback.balasan && autoResponseEnabled && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm text-blue-700">
+                            {processingAutoResponse 
+                              ? "Sedang memproses balasan otomatis..." 
+                              : "Auto Response akan menjawab feedback ini secara otomatis"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Textarea 
                       placeholder="Tulis respon..." 
                       value={responseValues[feedback.id] || ''}
                       onChange={(e) => setResponseValues(prev => ({
