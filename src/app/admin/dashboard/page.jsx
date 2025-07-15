@@ -62,10 +62,27 @@ export default function Dashboard() {
   const [monthlyData, setMonthlyData] = useState(null);
   const [personnelData, setPersonnelData] = useState(null);
   const [activeUsersData, setActiveUsersData] = useState(null);
+  const [handlingTimeData, setHandlingTimeData] = useState(null);
   const [error, setError] = useState(null);
   const [aiSummary, setAiSummary] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
+  const [lastRequestTime, setLastRequestTime] = useState(0);
+  const [requestCount, setRequestCount] = useState(0);
+  const [dataHash, setDataHash] = useState('');
+  const [tokenUsage, setTokenUsage] = useState({ input: 0, output: 0, total: 0 });
+
+  // Simple hash function for data comparison
+  const hashData = (data) => {
+    const str = JSON.stringify(data);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString();
+  };
 
   // Check authentication and authorization
   useEffect(() => {
@@ -144,8 +161,36 @@ export default function Dashboard() {
   const generateAiSummary = async (reports) => {
     if (!reports || reports.length === 0) return;
     
+    // Generate hash of current data
+    const currentHash = hashData(reports);
+    
+    // Check if data hasn't changed since last request
+    if (dataHash === currentHash && aiSummary && !summaryError) {
+      console.log('Data unchanged, using cached summary');
+      return;
+    }
+    
+    // Rate limiting protection
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    const minInterval = 10000; // 10 seconds minimum between requests
+    
+    // Check if we've made too many requests recently
+    if (timeSinceLastRequest < minInterval) {
+      console.log('Rate limiting: Skipping request, too soon since last request');
+      setSummaryError(`Menunggu ${Math.ceil((minInterval - timeSinceLastRequest) / 1000)} detik sebelum request berikutnya untuk menghindari rate limit.`);
+      return;
+    }
+    
+    // Update request tracking
+    setLastRequestTime(now);
+    setRequestCount(prev => prev + 1);
+    setDataHash(currentHash);
+    
     setIsSummaryLoading(true);
     setSummaryError(null);
+    
+    console.log(`Making AI request #${requestCount + 1} at ${new Date().toISOString()}`);
     
     try {
       // Create report text for AI analysis with additional pattern analysis
@@ -198,12 +243,37 @@ ${patternAnalysis}
 
 Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk mencegah masalah berulang.`;
 
+      // Estimate token usage (rough calculation)
+      const estimatedInputTokens = Math.ceil((systemInstruction.length + prompt.length) / 4);
+      console.log(`Estimated input tokens: ${estimatedInputTokens}`);
+
       const aiResponse = await chat.sendMessage(prompt);
+      
+      // Estimate output tokens
+      const estimatedOutputTokens = Math.ceil(aiResponse.length / 4);
+      const totalTokens = estimatedInputTokens + estimatedOutputTokens;
+      
+      // Update token usage tracking
+      setTokenUsage({
+        input: estimatedInputTokens,
+        output: estimatedOutputTokens,
+        total: totalTokens
+      });
+      
+      console.log(`Token usage - Input: ${estimatedInputTokens}, Output: ${estimatedOutputTokens}, Total: ${totalTokens}`);
+      
       setAiSummary(aiResponse);
+      console.log('AI request completed successfully');
       
     } catch (error) {
       console.error('Error generating AI summary:', error);
-      setSummaryError('Gagal menghasilkan ringkasan AI. Silakan coba lagi nanti.');
+      
+      // Handle rate limiting specifically
+      if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
+        setSummaryError('Rate limit tercapai. AI summary akan dinonaktifkan sementara untuk menghindari pembatasan API. Silakan refresh halaman dalam beberapa menit.');
+      } else {
+        setSummaryError('Gagal menghasilkan ringkasan AI. Silakan coba lagi nanti.');
+      }
     } finally {
       setIsSummaryLoading(false);
     }
@@ -399,8 +469,10 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
       totalUsers: totalUniqueUsers
     });
 
-    // Call AI summary generator with reports data
-    generateAiSummary(reports);
+    // Call AI summary generator with reports data (with rate limiting protection)
+    if (!isSummaryLoading && !aiSummary) {
+      generateAiSummary(reports);
+    }
 
     // 2. Process Category Data
     const categoriesCount = reports.reduce((acc, report) => {
@@ -539,6 +611,170 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
         ],
       }],
     });
+
+    // 6. Process Handling Time Data - Calculate average handling time for completed reports
+    const completedReportsWithTime = reports.filter(report => {
+      return report.status === 'Selesai' && report.created_at && report.updated_at;
+    });
+
+    console.log('Completed reports with time tracking:', completedReportsWithTime.length);
+    console.log('Sample report data:', completedReportsWithTime[0]);
+
+    const handlingTimeByCategory = {};
+    const handlingTimeByMonth = {};
+    const responseTimeByCategory = {};
+    const responseTimeByMonth = {};
+
+    completedReportsWithTime.forEach(report => {
+      const reportDate = new Date(report.created_at);
+      const responseDate = report.waktu_respon ? new Date(report.waktu_respon) : null;
+      const completionDate = new Date(report.updated_at);
+      
+      // Calculate total handling time (from report to completion)
+      const totalHandlingTime = Math.abs(completionDate - reportDate);
+      const totalHours = Math.ceil(totalHandlingTime / (1000 * 60 * 60));
+      
+      // Calculate response time (from report to first response)
+      let responseHours = null;
+      if (responseDate) {
+        const responseTime = Math.abs(responseDate - reportDate);
+        responseHours = Math.ceil(responseTime / (1000 * 60 * 60));
+      }
+      
+      // Group by category
+      const category = report.kategori || 'Lainnya';
+      if (!handlingTimeByCategory[category]) {
+        handlingTimeByCategory[category] = [];
+      }
+      handlingTimeByCategory[category].push(totalHours);
+      
+      if (responseHours !== null) {
+        if (!responseTimeByCategory[category]) {
+          responseTimeByCategory[category] = [];
+        }
+        responseTimeByCategory[category].push(responseHours);
+      }
+      
+      // Group by month
+      const month = reportDate.toLocaleString('default', { month: 'short' });
+      if (!handlingTimeByMonth[month]) {
+        handlingTimeByMonth[month] = [];
+      }
+      handlingTimeByMonth[month].push(totalHours);
+      
+      if (responseHours !== null) {
+        if (!responseTimeByMonth[month]) {
+          responseTimeByMonth[month] = [];
+        }
+        responseTimeByMonth[month].push(responseHours);
+      }
+    });
+
+    // Calculate averages by category for total handling time
+    const categoryAverages = Object.entries(handlingTimeByCategory).map(([category, times]) => {
+      const average = times.reduce((sum, time) => sum + time, 0) / times.length;
+      return { category, average: Math.round(average * 10) / 10, count: times.length };
+    });
+
+    // Calculate averages by category for response time
+    const responseAverages = Object.entries(responseTimeByCategory).map(([category, times]) => {
+      const average = times.reduce((sum, time) => sum + time, 0) / times.length;
+      return { category, average: Math.round(average * 10) / 10, count: times.length };
+    });
+
+    // Calculate averages by month for total handling time
+    const monthAverages = Object.entries(handlingTimeByMonth).map(([month, times]) => {
+      const average = times.reduce((sum, time) => sum + time, 0) / times.length;
+      return { month, average: Math.round(average * 10) / 10, count: times.length };
+    });
+
+    // Calculate averages by month for response time
+    const responseMonthAverages = Object.entries(responseTimeByMonth).map(([month, times]) => {
+      const average = times.reduce((sum, time) => sum + time, 0) / times.length;
+      return { month, average: Math.round(average * 10) / 10, count: times.length };
+    });
+
+    // Sort months properly
+    const sortedMonthAverages = monthAverages.sort((a, b) => {
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return months.indexOf(a.month) - months.indexOf(b.month);
+    });
+
+    const sortedResponseMonthAverages = responseMonthAverages.sort((a, b) => {
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return months.indexOf(a.month) - months.indexOf(b.month);
+    });
+
+    // Calculate overall statistics
+    const allHandlingTimes = Object.values(handlingTimeByCategory).flat();
+    const allResponseTimes = Object.values(responseTimeByCategory).flat();
+    
+    const overallHandlingAverage = allHandlingTimes.length > 0 ? 
+      Math.round((allHandlingTimes.reduce((sum, time) => sum + time, 0) / allHandlingTimes.length) * 10) / 10 : 0;
+    
+    const overallResponseAverage = allResponseTimes.length > 0 ? 
+      Math.round((allResponseTimes.reduce((sum, time) => sum + time, 0) / allResponseTimes.length) * 10) / 10 : 0;
+
+    setHandlingTimeData({
+      byCategory: {
+        labels: categoryAverages.map(item => item.category),
+        datasets: [
+          {
+            label: 'Rata-rata Total Penanganan (Jam)',
+            data: categoryAverages.map(item => item.average),
+            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 2,
+          },
+          {
+            label: 'Rata-rata Waktu Respon (Jam)',
+            data: categoryAverages.map(item => {
+              const responseCategory = responseAverages.find(r => r.category === item.category);
+              return responseCategory ? responseCategory.average : 0;
+            }),
+            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+            borderColor: 'rgba(16, 185, 129, 1)',
+            borderWidth: 2,
+          }
+        ],
+      },
+      byMonth: {
+        labels: sortedMonthAverages.map(item => item.month),
+        datasets: [
+          {
+            label: 'Rata-rata Total Penanganan (Jam)',
+            data: sortedMonthAverages.map(item => item.average),
+            borderColor: 'rgb(99, 102, 241)',
+            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+            tension: 0.1,
+          },
+          {
+            label: 'Rata-rata Waktu Respon (Jam)',
+            data: sortedMonthAverages.map(item => {
+              const responseMonth = sortedResponseMonthAverages.find(r => r.month === item.month);
+              return responseMonth ? responseMonth.average : 0;
+            }),
+            borderColor: 'rgb(16, 185, 129)',
+            backgroundColor: 'rgba(16, 185, 129, 0.5)',
+            tension: 0.1,
+          }
+        ],
+      },
+      stats: {
+        totalCompleted: completedReportsWithTime.length,
+        overallHandlingAverage: overallHandlingAverage,
+        overallResponseAverage: overallResponseAverage,
+        reportsWithResponse: allResponseTimes.length,
+        fastestCategory: categoryAverages.length > 0 ? 
+          categoryAverages.reduce((min, item) => item.average < min.average ? item : min) : null,
+        slowestCategory: categoryAverages.length > 0 ? 
+          categoryAverages.reduce((max, item) => item.average > max.average ? item : max) : null,
+        fastestResponseCategory: responseAverages.length > 0 ? 
+          responseAverages.reduce((min, item) => item.average < min.average ? item : min) : null,
+        slowestResponseCategory: responseAverages.length > 0 ? 
+          responseAverages.reduce((max, item) => item.average > max.average ? item : max) : null,
+      }
+    });
   };
 
   if (isLoading) {
@@ -614,61 +850,201 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Tren Laporan Bulanan</h3>
-          {monthlyData ? <Line data={monthlyData} options={{
-            responsive: true,
-            plugins: {
-              legend: { position: 'bottom' }
-            }
-          }} /> : <p>Loading chart data...</p>}
+          {monthlyData ? (
+            <div style={{ height: '300px' }}>
+              <Line data={monthlyData} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { position: 'bottom' }
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      stepSize: 1
+                    }
+                  }
+                }
+              }} />
+            </div>
+          ) : <p>Loading chart data...</p>}
         </Card>
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Distribusi Kategori</h3>
-          {categoryData ? <Pie data={categoryData} options={{
-            responsive: true,
-            plugins: {
-              legend: { 
-                position: 'bottom',
-                labels: {
-                  padding: 20,
-                  usePointStyle: true,
+          {categoryData ? (
+            <div style={{ height: '300px' }}>
+              <Pie data={categoryData} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { 
+                    position: 'bottom',
+                    labels: {
+                      padding: 20,
+                      usePointStyle: true,
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const label = context.label || '';
+                        const value = context.parsed || 0;
+                        const total = context.dataset.data.reduce((acc, data) => acc + data, 0);
+                        const percentage = ((value / total) * 100).toFixed(1);
+                        return `${label}: ${value} (${percentage}%)`;
+                      }
+                    }
+                  }
+                },
+              }} />
+            </div>
+          ) : <p>Loading chart data...</p>}
+        </Card>
+      </div>
+
+      {/* Grafik Waktu Penanganan */}
+      {handlingTimeData && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Waktu Penanganan per Kategori</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Perbandingan rata-rata waktu respon dan total penanganan berdasarkan kategori laporan
+            </p>
+            <Bar data={handlingTimeData.byCategory} options={{
+              responsive: true,
+              plugins: {
+                legend: { 
+                  position: 'bottom',
+                  display: true
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      const datasetLabel = context.dataset.label;
+                      const value = context.parsed.y;
+                      return `${datasetLabel}: ${value} jam rata-rata`;
+                    }
+                  }
                 }
               },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const label = context.label || '';
-                    const value = context.parsed || 0;
-                    const total = context.dataset.data.reduce((acc, data) => acc + data, 0);
-                    const percentage = ((value / total) * 100).toFixed(1);
-                    return `${label}: ${value} (${percentage}%)`;
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Jam'
                   }
                 }
               }
-            },
-            maintainAspectRatio: true,
-          }} /> : <p>Loading chart data...</p>}
-        </Card>
-      </div>
+            }} />
+          </Card>
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Tren Waktu Penanganan Bulanan</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Tren rata-rata waktu respon dan total penanganan laporan per bulan
+            </p>
+            <Line data={handlingTimeData.byMonth} options={{
+              responsive: true,
+              plugins: {
+                legend: { 
+                  position: 'bottom',
+                  display: true
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      const datasetLabel = context.dataset.label;
+                      const value = context.parsed.y;
+                      return `${datasetLabel}: ${value} jam rata-rata`;
+                    }
+                  }
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Jam'
+                  }
+                }
+              }
+            }} />
+          </Card>
+        </div>
+      )}
 
       {/* Grafik Personel dan Pengguna Aktif */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Personel Penanganan Laporan</h3>
-          <p className="text-sm text-gray-600 mb-4">Jumlah laporan yang ditangani oleh setiap personel berdasarkan kategori masalah</p>
-          {personnelData ? <Bar data={personnelData} options={{
-            responsive: true,
-            plugins: {
-              legend: { position: 'bottom' }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  stepSize: 1
-                }
-              }
-            }
-          }} /> : <p>Loading chart data...</p>}
+          <h3 className="text-lg font-semibold mb-4">🏆 Ranking Personel Penanganan Laporan</h3>
+          <p className="text-sm text-gray-600 mb-4">Peringkat personel berdasarkan jumlah laporan yang ditangani</p>
+          {personnelData && personnelData.labels.length > 0 ? (
+            <div className="space-y-3">
+              {personnelData.labels.map((name, index) => {
+                const count = personnelData.datasets[0].data[index];
+                const position = index + 1;
+                const percentage = personnelData.datasets[0].data.length > 0 ? 
+                  ((count / Math.max(...personnelData.datasets[0].data)) * 100).toFixed(1) : 0;
+                
+                // Medal colors for top 3
+                const getMedalColor = (pos) => {
+                  switch(pos) {
+                    case 1: return 'bg-yellow-100 border-yellow-300 text-yellow-800';
+                    case 2: return 'bg-gray-100 border-gray-300 text-gray-800';
+                    case 3: return 'bg-orange-100 border-orange-300 text-orange-800';
+                    default: return 'bg-blue-50 border-blue-200 text-blue-800';
+                  }
+                };
+
+                const getMedalIcon = (pos) => {
+                  switch(pos) {
+                    case 1: return '🥇';
+                    case 2: return '🥈';
+                    case 3: return '🥉';
+                    default: return `#${pos}`;
+                  }
+                };
+
+                return (
+                  <div key={name} className={`p-4 border-2 rounded-lg ${getMedalColor(position)}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="text-xl font-bold min-w-[3rem]">
+                          {getMedalIcon(position)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-lg">{name}</p>
+                          <p className="text-sm opacity-75">
+                            {personnelDatabase.find(p => p.name === name)?.position || 'Staff'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold">{count}</p>
+                        <p className="text-sm opacity-75">laporan</p>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <div className="w-full bg-white bg-opacity-50 rounded-full h-2">
+                        <div 
+                          className="bg-current h-2 rounded-full transition-all duration-500" 
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs mt-1 opacity-75">{percentage}% dari maksimal</p>
+                    </div>
+                  </div>
+                );
+              })}
+              {personnelData.labels.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Belum ada data personel yang menangani laporan</p>
+                </div>
+              )}
+            </div>
+          ) : <p>Loading ranking data...</p>}
         </Card>
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Pengguna Paling Aktif</h3>
@@ -691,11 +1067,35 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
       </div>
 
       {/* AI Summary */}
-      <h2 className="flex items-center gap-2 text-xl font-semibold mt-8">
-        <Sparkles className="w-5 h-5 text-purple-500" />
-        <TrendingUp className="w-5 h-5 text-blue-500" />
-        Ringkasan Eksekutif AI & Prediksi Masa Depan
-      </h2>
+      <div className="flex justify-between items-center mt-8">
+        <h2 className="flex items-center gap-2 text-xl font-semibold">
+          <Sparkles className="w-5 h-5 text-purple-500" />
+          <TrendingUp className="w-5 h-5 text-blue-500" />
+          Ringkasan Eksekutif AI & Prediksi Masa Depan
+        </h2>
+        {/* Debug info */}
+        <div className="flex items-center gap-4 text-xs text-gray-500">
+          <span>Requests: {requestCount}</span>
+          <span>Last: {lastRequestTime ? new Date(lastRequestTime).toLocaleTimeString() : 'None'}</span>
+          <span>Cache: {dataHash ? `${dataHash.substring(0, 8)}...` : 'Empty'}</span>
+          <span>Tokens: {tokenUsage.total > 0 ? `${tokenUsage.total} (${tokenUsage.input}→${tokenUsage.output})` : 'N/A'}</span>
+          <button 
+            onClick={() => {
+              setDataHash('');
+              setAiSummary('');
+              setSummaryError(null);
+              setTokenUsage({ input: 0, output: 0, total: 0 });
+              if (reports && reports.length > 0) {
+                generateAiSummary(reports);
+              }
+            }}
+            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+            title="Reset cache dan generate ulang AI summary"
+          >
+            🔄 Reset Cache
+          </button>
+        </div>
+      </div>
       <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200">
         {isSummaryLoading && (
           <div className="flex items-center gap-3">
@@ -704,8 +1104,28 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
           </div>
         )}
         {summaryError && (
-          <div className="text-red-700 bg-red-100 p-3 rounded-lg">
-            <p><strong>Gagal mendapatkan ringkasan AI:</strong> {summaryError}</p>
+          <div className="text-red-700 bg-red-100 p-4 rounded-lg border border-red-300">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold">Gagal mendapatkan ringkasan AI</p>
+                <p className="text-sm mt-1">{summaryError}</p>
+                <button 
+                  onClick={() => {
+                    setSummaryError(null);
+                    setAiSummary(''); // Clear existing summary to force regeneration
+                    if (stats.totalReports > 0) {
+                      fetchDashboardData(localStorage.getItem('token'));
+                    }
+                  }}
+                  className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm flex items-center gap-2"
+                  disabled={isSummaryLoading}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Coba Lagi
+                </button>
+              </div>
+            </div>
           </div>
         )}
         {aiSummary && !isSummaryLoading && (
@@ -737,10 +1157,68 @@ Berikan analisis lengkap dengan fokus khusus pada prediksi dan rekomendasi untuk
                 Tindakan preventif direkomendasikan untuk mengurangi keluhan berulang.
               </p>
             </div>
+            {/* Rate Limit Analysis */}
+            <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <h4 className="text-sm font-semibold text-amber-800 mb-2">📊 Analisis Rate Limiting</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-amber-700">
+                <div>
+                  <p className="font-medium">RPM Limit (30/min)</p>
+                  <p>Current: {requestCount}/30</p>
+                  <p className="text-green-600">✓ Safe</p>
+                </div>
+                <div>
+                  <p className="font-medium">TPM Limit (12K/min)</p>
+                  <p>Used: {tokenUsage.total}/12000</p>
+                  <p className={tokenUsage.total > 8000 ? "text-red-600" : "text-green-600"}>
+                    {tokenUsage.total > 8000 ? "⚠️ High" : "✓ Safe"}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-medium">Estimasi per Request</p>
+                  <p>~{tokenUsage.total} tokens</p>
+                  <p className="text-blue-600">📈 Monitor</p>
+                </div>
+                <div>
+                  <p className="font-medium">Kemungkinan Limit</p>
+                  <p className="font-semibold">
+                    {tokenUsage.total > 8000 ? "Token/Min" : 
+                     requestCount > 20 ? "Request/Min" : "Normal"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-amber-600">
+                <p><strong>Tips:</strong> Rate limiting biasanya disebabkan oleh RPM (30/min) atau TPM (12K/min). 
+                Jika token usage tinggi ({tokenUsage.total} tokens), kurangi jumlah data dalam 1 request.</p>
+              </div>
+            </div>
           </div>
         )}
         {!isSummaryLoading && !aiSummary && !summaryError && (
-            <p className="text-gray-500">Ringkasan dan prediksi akan muncul di sini setelah laporan dianalisis.</p>
+          <div className="text-center py-8">
+            <div className="animate-pulse">
+              <Sparkles className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+            </div>
+            <p className="text-gray-500 mb-4">
+              Klik tombol di bawah untuk menghasilkan ringkasan AI. 
+              <br />
+              <small className="text-xs">
+                Rate limit: max 1 request per 10 detik untuk menghindari pembatasan API.
+              </small>
+            </p>
+            <button 
+              onClick={() => {
+                if (stats.totalReports > 0) {
+                  // Get reports data for AI analysis
+                  fetchDashboardData(localStorage.getItem('token'));
+                }
+              }}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center gap-2 mx-auto"
+              disabled={isSummaryLoading}
+            >
+              <Sparkles className="w-4 h-4" />
+              Hasilkan Ringkasan AI
+            </button>
+          </div>
         )}
       </Card>
     </div>
