@@ -97,7 +97,7 @@ const updateReportRequest = async (reportId, payload) => {
   const directHeaders = { ...headers, 'Origin': window.location.origin };
 
   const proxyApiUrl = `/api/proxy?endpoint=laporan/${reportId}`;
-  const directApiUrl = `http://127.0.0.1:8000/api/laporan/${reportId}`;
+  const directApiUrl = `https://laravel.kasyifana.my.id/api/laporan/${reportId}`;
 
   let lastResponse;
 
@@ -193,7 +193,7 @@ export default function ReportsManagement() {
         // Try a direct API call as fallback
         try {
           console.log('Trying direct API call for user profile');
-          const directResponse = await fetch('http://127.0.0.1:8000/api/user/profile', {
+          const directResponse = await fetch('https://laravel.kasyifana.my.id/api/user/profile', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -253,7 +253,7 @@ export default function ReportsManagement() {
         if (response.status === 404) {
           console.warn('API endpoint returned 404, trying with direct URL...');
           
-          const fallbackUrl = 'http://127.0.0.1:8000/api/laporan';
+          const fallbackUrl = 'https://laravel.kasyifana.my.id/api/laporan';
           const fallbackResponse = await fetch(fallbackUrl, {
             method: 'GET',
             headers: {

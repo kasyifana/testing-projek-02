@@ -13,7 +13,7 @@ function formatResponse(data) {
 }
 
 // Test simple GET request first
-fetch('http://127.0.0.1:8000/api/status', {
+fetch('https://laravel.kasyifana.my.id/api/status', {
   method: 'GET',
   mode: 'cors',
   credentials: 'include',
@@ -36,7 +36,7 @@ fetch('http://127.0.0.1:8000/api/status', {
   
   console.log('Sending minimal POST request to test endpoint...');
   
-  return fetch('http://127.0.0.1:8000/api/laporan', {
+  return fetch('https://laravel.kasyifana.my.id/api/laporan', {
     method: 'POST',
     body: minimalFormData,
     mode: 'cors',

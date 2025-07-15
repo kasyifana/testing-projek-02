@@ -54,7 +54,7 @@ export default function AdminLayout({ children }) {
           return;
         }
 
-        const response = await fetch('http://127.0.0.1:8000/api/profile', {
+        const response = await fetch('https://laravel.kasyifana.my.id/api/profile', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,

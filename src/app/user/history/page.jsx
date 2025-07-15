@@ -139,7 +139,7 @@ export default function History() {
           console.warn('The API endpoint returned 404, trying with direct URL...');
           
           // Try a different format of the API URL as fallback
-          const fallbackUrl = 'http://127.0.0.1:8000/api/laporan';
+          const fallbackUrl = 'https://laravel.kasyifana.my.id/api/laporan';
           const fallbackResponse = await fetch(fallbackUrl, {
             method: 'GET',
             headers: {

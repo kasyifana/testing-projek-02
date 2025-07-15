@@ -14,7 +14,7 @@ async function testLoginAPI() {
     console.log(`\n--- Testing with ${cred.email} ---`);
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/login', {
+      const response = await fetch('https://laravel.kasyifana.my.id/api/login', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ async function testAPIConnectivity() {
   console.log('=== Testing API Connectivity ===');
   
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/test', {
+    const response = await fetch('https://laravel.kasyifana.my.id/api/test', {
       method: 'GET',
       mode: 'cors'
     });
@@ -72,7 +72,7 @@ async function testAPIConnectivity() {
   
   // Test basic endpoint
   try {
-    const response = await fetch('http://127.0.0.1:8000', {
+    const response = await fetch('https://laravel.kasyifana.my.id', {
       method: 'GET',
       mode: 'cors'
     });

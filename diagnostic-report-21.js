@@ -15,7 +15,7 @@ const runDiagnostic = async () => {
     
     // First fetch report ID 21
     console.log("Fetching Report ID 21...");
-    const report21Response = await fetch('http://127.0.0.1:8000/api/laporan/21', {
+    const report21Response = await fetch('https://laravel.kasyifana.my.id/api/laporan/21', {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -26,7 +26,7 @@ const runDiagnostic = async () => {
     
     // Now fetch a working report ID (e.g., ID 1) for comparison
     console.log("Fetching working Report ID 1 for comparison...");
-    const report1Response = await fetch('http://127.0.0.1:8000/api/laporan/1', {
+    const report1Response = await fetch('https://laravel.kasyifana.my.id/api/laporan/1', {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',

@@ -69,7 +69,7 @@ const testReportEndpoints = async () => {
   }
   
   // 2. Test direct endpoint with various methods
-  const directBaseUrl = `http://127.0.0.1:8000/api/laporan`;
+  const directBaseUrl = `https://laravel.kasyifana.my.id/api/laporan`;
   
   console.log('4. Testing direct API with GET method...');
   try {

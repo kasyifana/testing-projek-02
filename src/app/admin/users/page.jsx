@@ -107,7 +107,7 @@ export default function UserManagement() {
       }
       
       // Construct URL with query parameters for pagination and filtering
-      let url = `http://127.0.0.1:8000/api/admin/users?page=${currentPage}&perPage=${itemsPerPage}`;
+      let url = `https://laravel.kasyifana.my.id/api/admin/users?page=${currentPage}&perPage=${itemsPerPage}`;
       if (searchTerm) {
         url += `&search=${encodeURIComponent(searchTerm)}`;
       }
@@ -198,7 +198,7 @@ export default function UserManagement() {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://127.0.0.1:8000/api/admin/users/${userId}/toggle-admin`, {
+      const response = await fetch(`https://laravel.kasyifana.my.id/api/admin/users/${userId}/toggle-admin`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -239,7 +239,7 @@ export default function UserManagement() {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://127.0.0.1:8000/api/admin/users/${userId}`, {
+      const response = await fetch(`https://laravel.kasyifana.my.id/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -291,7 +291,7 @@ export default function UserManagement() {
         return;
       }
       
-      const response = await fetch('http://127.0.0.1:8000/api/admin/stats', {
+      const response = await fetch('https://laravel.kasyifana.my.id/api/admin/stats', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

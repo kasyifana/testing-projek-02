@@ -90,7 +90,7 @@ export default function Review() {
       
       // Skip the HEAD check as it might be causing issues
       // Go directly to GET request with appropriate headers
-      const response = await fetch(`http://127.0.0.1:8000/api/feedback?page=${page}`, {
+      const response = await fetch(`https://laravel.kasyifana.my.id/api/feedback?page=${page}`, {
         headers: getAuthHeaders(),
         mode: 'cors',
       }).catch(err => {
@@ -188,7 +188,7 @@ export default function Review() {
       setIsSubmitting(true);
       
       // Check if API is available
-      const checkResponse = await fetch('http://127.0.0.1:8000/api/feedback', {
+      const checkResponse = await fetch('https://laravel.kasyifana.my.id/api/feedback', {
         method: 'HEAD',
         headers: getAuthHeaders(),
         mode: 'cors',
@@ -213,7 +213,7 @@ export default function Review() {
         
         return;
       }        // If API is available, make the actual request
-      const response = await fetch('http://127.0.0.1:8000/api/feedback', {
+      const response = await fetch('https://laravel.kasyifana.my.id/api/feedback', {
         method: 'POST',
         headers: getAuthHeaders(),
         mode: 'cors',

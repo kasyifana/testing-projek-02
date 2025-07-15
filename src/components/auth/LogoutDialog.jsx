@@ -49,7 +49,7 @@ export function useLogoutHandler() {
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout
       
       try {
-        fetch('http://127.0.0.1:8000/api/logout', {
+        fetch('https://laravel.kasyifana.my.id/api/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

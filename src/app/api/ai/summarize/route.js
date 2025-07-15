@@ -11,7 +11,7 @@ export async function POST(request) {
     }
 
     // Fetch reports from Laravel API (similar to proxy logic)
-    const apiUrl = 'http://127.0.0.1:8000/api/laporan';
+    const apiUrl = 'https://laravel.kasyifana.my.id/api/laporan';
     const headers = {
       'Accept': 'application/json',
       'Authorization': authHeader,

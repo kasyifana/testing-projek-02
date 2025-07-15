@@ -102,7 +102,7 @@ export function RegisterDialog({ isOpen, onClose }) {
 				console.error("Failed to load animation:", error);
 			});		// Fetch program study options from external PHP API
 		setIsLoadingPrograms(true);
-		fetch('http://127.0.0.1:8000/api/program-studi', {
+		fetch('https://laravel.kasyifana.my.id/api/program-studi', {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',
@@ -193,7 +193,7 @@ export function RegisterDialog({ isOpen, onClose }) {
 		console.log("Form submitted with data:", data);
 		
 		// Send registration data to external PHP API endpoint
-		fetch('http://127.0.0.1:8000/api/register', {
+		fetch('https://laravel.kasyifana.my.id/api/register', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',

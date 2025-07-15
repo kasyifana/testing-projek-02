@@ -16,7 +16,7 @@ async function proxyRequest(request) {
       return NextResponse.json({ error: 'Endpoint parameter is required' }, { status: 400 });
     }
 
-    const apiUrl = `http://127.0.0.1:8000/api/${endpoint}`;
+    const apiUrl = `https://laravel.kasyifana.my.id/api/${endpoint}`;
     const contentType = request.headers.get('content-type') || '';
     const authHeader = request.headers.get('authorization');
 
@@ -115,11 +115,11 @@ export async function GET(request) {
     const endpoint = url.searchParams.get('endpoint') || 'profile';
     
     // Default to profile endpoint
-    let apiUrl = 'http://127.0.0.1:8000/api/profile';
+    let apiUrl = 'https://laravel.kasyifana.my.id/api/profile';
     
     // Allow different endpoints based on the endpoint parameter
     if (endpoint === 'user') {
-      apiUrl = 'http://127.0.0.1:8000/api/user';
+      apiUrl = 'https://laravel.kasyifana.my.id/api/user';
       
     } else if (endpoint.startsWith('laporan')) {
       // Handle laporan endpoints
@@ -127,17 +127,17 @@ export async function GET(request) {
       
       if (parts.length === 1) {
         // GET /api/laporan - Get all reports
-        apiUrl = 'http://127.0.0.1:8000/api/laporan';
+        apiUrl = 'https://laravel.kasyifana.my.id/api/laporan';
         
       } else if (parts[1] === 'status' && parts.length > 2) {
         // GET /api/laporan/status/{status} - Get reports by status
         const status = parts[2];
-        apiUrl = `http://127.0.0.1:8000/api/laporan/status/${status}`;
+        apiUrl = `https://laravel.kasyifana.my.id/api/laporan/status/${status}`;
         
       } else {
         // GET /api/laporan/{id} - Get a specific report
         const reportId = parts[1];
-        apiUrl = `http://127.0.0.1:8000/api/laporan/${reportId}`;
+        apiUrl = `https://laravel.kasyifana.my.id/api/laporan/${reportId}`;
         
       }
     }

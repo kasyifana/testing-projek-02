@@ -142,7 +142,7 @@ export default function FeedbackPage() {
       }
 
       // Send the auto response
-      const response = await fetch(`http://127.0.0.1:8000/api/admin/feedback/${feedback.id}/reply`, {
+      const response = await fetch(`https://laravel.kasyifana.my.id/api/admin/feedback/${feedback.id}/reply`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -206,7 +206,7 @@ export default function FeedbackPage() {
   const fetchFeedbackData = async () => {
     setIsLoading(true);
     try {
-      let url = 'http://127.0.0.1:8000/api/admin/feedback';
+      let url = 'https://laravel.kasyifana.my.id/api/admin/feedback';
       if (statusFilter !== 'all') {
         url += `?status=${statusFilter}`;
       }
@@ -347,7 +347,7 @@ export default function FeedbackPage() {
     
     try {
       // Sesuai dengan struktur tabel feedback, kita hanya perlu mengirim balasan
-      const response = await fetch(`http://127.0.0.1:8000/api/admin/feedback/${feedbackId}/reply`, {
+      const response = await fetch(`https://laravel.kasyifana.my.id/api/admin/feedback/${feedbackId}/reply`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -393,7 +393,7 @@ export default function FeedbackPage() {
     setIsDeleting(true);
     
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/admin/feedback/${deletingId}`, {
+      const response = await fetch(`https://laravel.kasyifana.my.id/api/admin/feedback/${deletingId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });

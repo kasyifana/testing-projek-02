@@ -85,7 +85,7 @@ export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
       try {
       console.log('Attempting login with:', { email: data.email, password: '[REDACTED]' });
       
-      const response = await fetch('http://127.0.0.1:8000/api/login', {
+      const response = await fetch('https://laravel.kasyifana.my.id/api/login', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -175,7 +175,7 @@ export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
         } else {
           // Fetch user profile jika tidak ada user di response login
           try {
-            const profileResponse = await fetch('http://127.0.0.1:8000/api/profile', {
+            const profileResponse = await fetch('https://laravel.kasyifana.my.id/api/profile', {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -417,7 +417,7 @@ export function LoginDialog({ isOpen, onClose, onRegisterClick }) {
       let errorMsg = 'Tidak dapat terhubung ke server.';
       
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        errorMsg = 'Tidak dapat terhubung ke Laravel API. Pastikan server berjalan di http://127.0.0.1:8000';
+        errorMsg = 'Tidak dapat terhubung ke Laravel API. Pastikan server berjalan di https://laravel.kasyifana.my.id';
       } else if (error.message) {
         errorMsg = error.message;
       }

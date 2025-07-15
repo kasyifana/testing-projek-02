@@ -15,7 +15,7 @@ const testUpdateReport21 = async () => {
     
     // First fetch report ID 21 to get current data
     console.log("Fetching Report ID 21...");
-    const report21Response = await fetch('http://127.0.0.1:8000/api/laporan/21', {
+    const report21Response = await fetch('https://laravel.kasyifana.my.id/api/laporan/21', {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ const testUpdateReport21 = async () => {
     // Test 1: Try minimal update with PUT
     console.log("\n=== Test 1: Minimal Update with PUT ===");
     try {
-      const putMinimalResponse = await fetch('http://127.0.0.1:8000/api/laporan/21', {
+      const putMinimalResponse = await fetch('https://laravel.kasyifana.my.id/api/laporan/21', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -79,7 +79,7 @@ const testUpdateReport21 = async () => {
     // Test 2: Try full update with PUT
     console.log("\n=== Test 2: Full Update with PUT ===");
     try {
-      const putFullResponse = await fetch('http://127.0.0.1:8000/api/laporan/21', {
+      const putFullResponse = await fetch('https://laravel.kasyifana.my.id/api/laporan/21', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -106,7 +106,7 @@ const testUpdateReport21 = async () => {
     // Test 3: Try minimal update with POST
     console.log("\n=== Test 3: Minimal Update with POST ===");
     try {
-      const postMinimalResponse = await fetch('http://127.0.0.1:8000/api/laporan/21', {
+      const postMinimalResponse = await fetch('https://laravel.kasyifana.my.id/api/laporan/21', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -133,7 +133,7 @@ const testUpdateReport21 = async () => {
     // Test 4: Try full update with POST
     console.log("\n=== Test 4: Full Update with POST ===");
     try {
-      const postFullResponse = await fetch('http://127.0.0.1:8000/api/laporan/21', {
+      const postFullResponse = await fetch('https://laravel.kasyifana.my.id/api/laporan/21', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

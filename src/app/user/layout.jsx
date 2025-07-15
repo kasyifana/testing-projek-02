@@ -228,7 +228,7 @@ export default function UserLayout({ children }) {
           router.push('/');
           return;
         }
-        const response = await fetch('http://127.0.0.1:8000/api/profile', {
+        const response = await fetch('https://laravel.kasyifana.my.id/api/profile', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -273,7 +273,7 @@ export default function UserLayout({ children }) {
         
         // Provide more specific error handling
         if (error.message.includes('fetch')) {
-          console.error('Network error - please check connection and server at http://127.0.0.1:8000');
+          console.error('Network error - please check connection and server at https://laravel.kasyifana.my.id');
         } else if (error.message.includes('401')) {
           console.error('Authentication failed - token may be expired');
           clearAuthData();
