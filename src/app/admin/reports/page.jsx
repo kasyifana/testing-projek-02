@@ -54,106 +54,74 @@ const formatDateTime = (dateString, timeString) => {
   return date.toLocaleDateString('id-ID', options);
 };
 
-// Utility function to resolve attachment URL from various path formats
-// Priority: public/storage > public/uploads > other paths
-const resolveAttachmentUrl = (attachmentPath) => {
-  if (!attachmentPath) return null;
-  
-  // If it's already a complete URL, return as is
-  if (attachmentPath.startsWith('http')) {
-    return attachmentPath;
-  }
-  
-  // Extract filename from path
-  const fileName = attachmentPath.split('/').pop();
-  
-  // Log for debugging
-  console.log('Resolving attachment path:', attachmentPath);
-  console.log('Extracted filename:', fileName);
-  
-  // Define possible paths to try - PRIORITIZE public/storage then public/uploads
-  const possiblePaths = [
-    // PRIORITY 1: public/storage paths (local storage) - check if exists
-    `/storage/${fileName}`,
-    `/public/storage/${fileName}`,
-    
-    // PRIORITY 2: public/uploads paths (where files actually are)
-    `/uploads/${fileName}`,
-    `/public/uploads/${fileName}`,
-    
-    // PRIORITY 3: Handle different input formats
-    attachmentPath.includes('/storage/') ? attachmentPath : null,
-    attachmentPath.includes('/uploads/') ? attachmentPath : null,
-    attachmentPath.includes('public/uploads/') ? `/uploads/${fileName}` : null,
-    
-    // PRIORITY 4: Special lampiran paths
-    attachmentPath.startsWith('lampiran/') ? `/uploads/${attachmentPath}` : null,
-    attachmentPath.startsWith('lampiran_') ? `/uploads/${attachmentPath}` : null,
-    fileName.startsWith('lampiran_') ? `/uploads/${fileName}` : null,
-    
-    // PRIORITY 5: Fallback paths with relative paths
-    `./storage/${fileName}`,
-    `./public/storage/${fileName}`,
-    `./uploads/${fileName}`,
-    `./public/uploads/${fileName}`,
-    
-    // PRIORITY 6: Default paths
-    `/storage/${attachmentPath}`,
-    `/uploads/${attachmentPath}`
-  ].filter(Boolean);
-  
-  // For now, prioritize uploads since that's where files actually are
-  const uploadsFirst = possiblePaths.filter(path => path.includes('/uploads/')).concat(
-    possiblePaths.filter(path => !path.includes('/uploads/'))
-  );
-  
-  console.log('Possible paths (uploads first):', uploadsFirst);
-  
-  // Return the first path that prioritizes uploads
-  return uploadsFirst[0] || `/uploads/${fileName}`;
-};
-
-// Function to check if file exists and return working URL
+// Optimized function to get working attachment URL with fallbacks
 // Priority: public/uploads (where files actually are) > public/storage > other paths
-const getWorkingAttachmentUrl = (attachmentPath) => {
-  const baseUrl = resolveAttachmentUrl(attachmentPath);
-  const fileName = attachmentPath.split('/').pop();
+const getWorkingAttachmentUrl = (() => {
+  const cache = new Map();
   
-  console.log('Getting working attachment URL for:', attachmentPath);
-  console.log('Base URL:', baseUrl);
-  console.log('Filename:', fileName);
-  
-  // Return an object with primary URL and fallback URLs
-  // PRIORITIZE public/uploads since files are actually there
-  return {
-    primary: baseUrl,
-    fallbacks: [
-      // PRIORITY 1: public/uploads paths (where files actually are)
-      `/uploads/${fileName}`,
-      `/public/uploads/${fileName}`,
-      `./uploads/${fileName}`,
-      `./public/uploads/${fileName}`,
-      
-      // PRIORITY 2: public/storage paths (for future use)
-      `/storage/${fileName}`,
-      `/public/storage/${fileName}`,
-      `./storage/${fileName}`,
-      `./public/storage/${fileName}`,
-      
-      // PRIORITY 3: Handle different input formats
-      attachmentPath.includes('/uploads/') ? attachmentPath : null,
-      attachmentPath.includes('/storage/') ? attachmentPath : null,
-      
-      // PRIORITY 4: Filename-based fallbacks
-      fileName.startsWith('lampiran_') ? `/uploads/${fileName}` : null,
-      fileName.startsWith('lampiran_') ? `/storage/${fileName}` : null,
-      
-      // PRIORITY 5: Original path variations
-      attachmentPath.startsWith('lampiran_') ? `/uploads/${attachmentPath}` : null,
-      attachmentPath.startsWith('lampiran_') ? `/storage/${attachmentPath}` : null
-    ].filter(Boolean)
+  return (attachmentPath) => {
+    if (!attachmentPath) return null;
+    
+    // Check cache first to avoid repeated processing
+    if (cache.has(attachmentPath)) {
+      return cache.get(attachmentPath);
+    }
+    
+    // If it's already a complete URL, return as is
+    if (attachmentPath.startsWith('http')) {
+      const result = {
+        primary: attachmentPath,
+        fallbacks: []
+      };
+      cache.set(attachmentPath, result);
+      return result;
+    }
+    
+    // Extract filename from path
+    const fileName = attachmentPath.split('/').pop();
+    
+    // Create unique paths using Set to avoid duplicates
+    const pathSet = new Set();
+    
+    // PRIORITY 1: Direct uploads paths (most likely to work)
+    pathSet.add(`/uploads/${fileName}`);
+    pathSet.add(`/public/uploads/${fileName}`);
+    
+    // PRIORITY 2: Handle original path if it contains uploads
+    if (attachmentPath.includes('/uploads/')) {
+      pathSet.add(attachmentPath);
+    }
+    
+    // PRIORITY 3: Storage paths (future use)
+    pathSet.add(`/storage/${fileName}`);
+    pathSet.add(`/public/storage/${fileName}`);
+    
+    // PRIORITY 4: Handle original path if it contains storage
+    if (attachmentPath.includes('/storage/')) {
+      pathSet.add(attachmentPath);
+    }
+    
+    // PRIORITY 5: Relative paths
+    pathSet.add(`./uploads/${fileName}`);
+    pathSet.add(`./public/uploads/${fileName}`);
+    pathSet.add(`./storage/${fileName}`);
+    pathSet.add(`./public/storage/${fileName}`);
+    
+    // Convert Set to Array and remove duplicates
+    const uniquePaths = Array.from(pathSet);
+    
+    // Create result object
+    const result = {
+      primary: uniquePaths[0],
+      fallbacks: uniquePaths.slice(1)
+    };
+    
+    // Cache the result
+    cache.set(attachmentPath, result);
+    
+    return result;
   };
-};
+})();
 
 // Map backend status to frontend status
 const mapStatus = (backendStatus) => {
@@ -1459,14 +1427,15 @@ function ExpandableReportCard({
                               const allUrls = [urlInfo.primary, ...urlInfo.fallbacks];
                               const currentIndex = allUrls.indexOf(currentSrc);
                               
-                              console.log('Image failed to load:', currentSrc);
-                              console.log('Current index:', currentIndex);
-                              console.log('All available URLs:', allUrls);
+                              // Only log the first failure to avoid spam
+                              if (currentIndex === 0) {
+                                console.log('Image failed to load:', currentSrc);
+                                console.log('Trying fallback URLs...');
+                              }
                               
                               // Try next URL
                               if (currentIndex + 1 < allUrls.length) {
                                 const nextUrl = allUrls[currentIndex + 1];
-                                console.log('Trying next URL:', nextUrl);
                                 e.target.src = nextUrl;
                                 return;
                               }
@@ -1497,9 +1466,11 @@ function ExpandableReportCard({
                             
                             tryNextUrl();
                           }}
-                          onLoad={() => {
-                            // Log successful load for debugging
-                            console.log('Image loaded successfully:', urlInfo.primary);
+                          onLoad={(e) => {
+                            // Log successful load for debugging (only once)
+                            if (e.target.src === urlInfo.primary) {
+                              console.log('Image loaded successfully:', urlInfo.primary);
+                            }
                           }}
                         />
                         {/* Show download button for images */}
