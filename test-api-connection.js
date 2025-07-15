@@ -1,5 +1,5 @@
 // Simple script to test PHP backend connection
-fetch('http://localhost:9002/api/status', {
+fetch('https://laravel.kasyifana.my.id/api/status', {
   method: 'GET',
   headers: {
     'Content-Type': 'application/json',

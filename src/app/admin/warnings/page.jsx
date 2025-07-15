@@ -54,15 +54,17 @@ export default function WarningsPage() {
         return;
       }
 
-      // Fetch all reports
-      const apiUrl = `/api/proxy?endpoint=laporan`;
+      // Fetch all reports directly
+      const apiUrl = `https://laravel.kasyifana.my.id/api/laporan`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        mode: 'cors'
       });
 
       if (!response.ok) {

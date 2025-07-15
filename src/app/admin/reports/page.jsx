@@ -54,6 +54,107 @@ const formatDateTime = (dateString, timeString) => {
   return date.toLocaleDateString('id-ID', options);
 };
 
+// Utility function to resolve attachment URL from various path formats
+// Priority: public/storage > public/uploads > other paths
+const resolveAttachmentUrl = (attachmentPath) => {
+  if (!attachmentPath) return null;
+  
+  // If it's already a complete URL, return as is
+  if (attachmentPath.startsWith('http')) {
+    return attachmentPath;
+  }
+  
+  // Extract filename from path
+  const fileName = attachmentPath.split('/').pop();
+  
+  // Log for debugging
+  console.log('Resolving attachment path:', attachmentPath);
+  console.log('Extracted filename:', fileName);
+  
+  // Define possible paths to try - PRIORITIZE public/storage then public/uploads
+  const possiblePaths = [
+    // PRIORITY 1: public/storage paths (local storage) - check if exists
+    `/storage/${fileName}`,
+    `/public/storage/${fileName}`,
+    
+    // PRIORITY 2: public/uploads paths (where files actually are)
+    `/uploads/${fileName}`,
+    `/public/uploads/${fileName}`,
+    
+    // PRIORITY 3: Handle different input formats
+    attachmentPath.includes('/storage/') ? attachmentPath : null,
+    attachmentPath.includes('/uploads/') ? attachmentPath : null,
+    attachmentPath.includes('public/uploads/') ? `/uploads/${fileName}` : null,
+    
+    // PRIORITY 4: Special lampiran paths
+    attachmentPath.startsWith('lampiran/') ? `/uploads/${attachmentPath}` : null,
+    attachmentPath.startsWith('lampiran_') ? `/uploads/${attachmentPath}` : null,
+    fileName.startsWith('lampiran_') ? `/uploads/${fileName}` : null,
+    
+    // PRIORITY 5: Fallback paths with relative paths
+    `./storage/${fileName}`,
+    `./public/storage/${fileName}`,
+    `./uploads/${fileName}`,
+    `./public/uploads/${fileName}`,
+    
+    // PRIORITY 6: Default paths
+    `/storage/${attachmentPath}`,
+    `/uploads/${attachmentPath}`
+  ].filter(Boolean);
+  
+  // For now, prioritize uploads since that's where files actually are
+  const uploadsFirst = possiblePaths.filter(path => path.includes('/uploads/')).concat(
+    possiblePaths.filter(path => !path.includes('/uploads/'))
+  );
+  
+  console.log('Possible paths (uploads first):', uploadsFirst);
+  
+  // Return the first path that prioritizes uploads
+  return uploadsFirst[0] || `/uploads/${fileName}`;
+};
+
+// Function to check if file exists and return working URL
+// Priority: public/uploads (where files actually are) > public/storage > other paths
+const getWorkingAttachmentUrl = (attachmentPath) => {
+  const baseUrl = resolveAttachmentUrl(attachmentPath);
+  const fileName = attachmentPath.split('/').pop();
+  
+  console.log('Getting working attachment URL for:', attachmentPath);
+  console.log('Base URL:', baseUrl);
+  console.log('Filename:', fileName);
+  
+  // Return an object with primary URL and fallback URLs
+  // PRIORITIZE public/uploads since files are actually there
+  return {
+    primary: baseUrl,
+    fallbacks: [
+      // PRIORITY 1: public/uploads paths (where files actually are)
+      `/uploads/${fileName}`,
+      `/public/uploads/${fileName}`,
+      `./uploads/${fileName}`,
+      `./public/uploads/${fileName}`,
+      
+      // PRIORITY 2: public/storage paths (for future use)
+      `/storage/${fileName}`,
+      `/public/storage/${fileName}`,
+      `./storage/${fileName}`,
+      `./public/storage/${fileName}`,
+      
+      // PRIORITY 3: Handle different input formats
+      attachmentPath.includes('/uploads/') ? attachmentPath : null,
+      attachmentPath.includes('/storage/') ? attachmentPath : null,
+      
+      // PRIORITY 4: Filename-based fallbacks
+      fileName.startsWith('lampiran_') ? `/uploads/${fileName}` : null,
+      fileName.startsWith('lampiran_') ? `/storage/${fileName}` : null,
+      
+      // PRIORITY 5: Original path variations
+      attachmentPath.startsWith('lampiran_') ? `/uploads/${attachmentPath}` : null,
+      attachmentPath.startsWith('lampiran_') ? `/storage/${attachmentPath}` : null
+    ].filter(Boolean)
+  };
+};
+
 // Map backend status to frontend status
 const mapStatus = (backendStatus) => {
   switch (backendStatus) {
@@ -96,7 +197,6 @@ const updateReportRequest = async (reportId, payload) => {
   };
   const directHeaders = { ...headers, 'Origin': window.location.origin };
 
-  const proxyApiUrl = `/api/proxy?endpoint=laporan/${reportId}`;
   const directApiUrl = `https://laravel.kasyifana.my.id/api/laporan/${reportId}`;
 
   let lastResponse;
@@ -112,15 +212,9 @@ const updateReportRequest = async (reportId, payload) => {
   };
 
   try {
-    // Attempt 1: Proxy
-    console.log('Attempting request via proxy...');
-    lastResponse = await tryRequestMethods(proxyApiUrl, { headers, body });
-
-    // Attempt 2: Direct API if proxy failed
-    if (!lastResponse.ok) {
-      console.warn('Proxy request failed, trying direct API call...');
-      lastResponse = await tryRequestMethods(directApiUrl, { headers: directHeaders, body, mode: 'cors' });
-    }
+    // Direct API call
+    console.log('Attempting request via direct API...');
+    lastResponse = await tryRequestMethods(directApiUrl, { headers: directHeaders, body, mode: 'cors' });
   } catch (error) {
     console.error('A network error occurred:', error);
     throw new Error('Gagal terhubung ke server. Periksa koneksi internet Anda.');
@@ -179,42 +273,18 @@ export default function ReportsManagement() {
       }
       
       console.log('Fetching user profile...');
-      // Adjust the endpoint based on your actual API
-      const response = await fetch('/api/proxy?endpoint=user/profile', {
+      // Direct API call
+      const response = await fetch('https://laravel.kasyifana.my.id/api/profile', {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        mode: 'cors'
       });
       
       if (!response.ok) {
         console.error(`Error fetching user profile: ${response.status} ${response.statusText}`);
-        
-        // Try a direct API call as fallback
-        try {
-          console.log('Trying direct API call for user profile');
-          const directResponse = await fetch('https://laravel.kasyifana.my.id/api/user/profile', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Origin': window.location.origin
-            },
-            mode: 'cors'
-          });
-          
-          if (directResponse.ok) {
-            console.log('Direct API call for user profile succeeded');
-            const data = await directResponse.json();
-            console.log('User profile from direct API:', data);
-            setUserProfile(data);
-            return;
-          } else {
-            console.error(`Direct API call for user profile failed: ${directResponse.status}`);
-          }
-        } catch (directErr) {
-          console.error('Direct API call for user profile failed:', directErr);
-        }
-        
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
       
@@ -237,15 +307,17 @@ export default function ReportsManagement() {
         return;
       }
 
-      // Use API endpoint to fetch all reports
-      const apiUrl = `/api/proxy?endpoint=laporan`;
+      // Use direct API endpoint to fetch all reports
+      const apiUrl = `https://laravel.kasyifana.my.id/api/laporan`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        mode: 'cors'
       });
 
       if (!response.ok) {
@@ -338,6 +410,28 @@ export default function ReportsManagement() {
           }];
         }
         
+        // Enhanced original data processing for attachments
+        const enhancedOriginal = {
+          ...report,
+          // Handle attachment files - check multiple possible fields
+          lampiran: report.lampiran || report.lampiran_filename || report.attachment || null,
+          lampiran_filename: report.lampiran_filename || report.lampiran || report.attachment || null,
+          lampiran_original_name: report.lampiran_original_name || report.original_filename || null,
+          lampiran_type: report.lampiran_type || report.file_type || null,
+          lampiran_size: report.lampiran_size || report.file_size || null
+        };
+        
+        // Log attachment info for debugging
+        if (enhancedOriginal.lampiran || enhancedOriginal.lampiran_filename) {
+          console.log('Attachment found for report:', report.id_laporan || report.id, {
+            lampiran: enhancedOriginal.lampiran,
+            lampiran_filename: enhancedOriginal.lampiran_filename,
+            lampiran_original_name: enhancedOriginal.lampiran_original_name,
+            lampiran_type: enhancedOriginal.lampiran_type,
+            lampiran_size: enhancedOriginal.lampiran_size
+          });
+        }
+        
         return {
           id: report.id_laporan || report.id,
           title: report.judul,
@@ -350,8 +444,8 @@ export default function ReportsManagement() {
           submittedAt: formatDateTime(report.tanggal_lapor, report.waktu_lapor),
           estimatedTime: '',
           responses: responses,
-          // Keep the original data for reference when updating
-          original: report
+          // Keep the enhanced original data for reference when updating
+          original: enhancedOriginal
         };
       });
       
@@ -1312,56 +1406,153 @@ function ExpandableReportCard({
           ) : null}
 
           {/* Attachment display if available */}
-          {report.original && report.original.lampiran && (
+          {(report.original && (report.original.lampiran || report.original.lampiran_filename)) && (
             <div className="mb-4 mt-2">
               <h4 className="font-semibold mb-2">Lampiran:</h4>
+              
+              {/* Show file metadata if available */}
+              {(report.original.lampiran_original_name || report.original.lampiran_type || report.original.lampiran_size) && (
+                <div className="mb-2 p-2 bg-gray-50 rounded text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    {report.original.lampiran_original_name && (
+                      <div>
+                        <span className="font-medium">Nama asli:</span> {report.original.lampiran_original_name}
+                      </div>
+                    )}
+                    {report.original.lampiran_type && (
+                      <div>
+                        <span className="font-medium">Tipe:</span> {report.original.lampiran_type}
+                      </div>
+                    )}
+                    {report.original.lampiran_size && (
+                      <div>
+                        <span className="font-medium">Ukuran:</span> {(report.original.lampiran_size / 1024).toFixed(2)} KB
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <div className="overflow-hidden rounded-md border border-gray-200">
                 {(() => {
-                  // Format the attachment URL
-                  const attachmentPath = report.original.lampiran;
-                  let attachmentUrl;
+                  // Get attachment path from either lampiran or lampiran_filename
+                  const attachmentPath = report.original.lampiran || report.original.lampiran_filename;
                   
-                  if (attachmentPath.includes('public/uploads/')) {
-                    const fileName = attachmentPath.split('/').pop();
-                    attachmentUrl = `/uploads/${fileName}`;
-                  } else if (attachmentPath.includes('/uploads/') || attachmentPath.includes('/storage/')) {
-                    attachmentUrl = attachmentPath;
-                  } else if (attachmentPath.startsWith('lampiran/')) {
-                    attachmentUrl = `/uploads/${attachmentPath}`;
-                  } else if (attachmentPath.startsWith('lampiran_')) {
-                    attachmentUrl = `/uploads/${attachmentPath}`;
-                  } else {
-                    attachmentUrl = `/uploads/${attachmentPath}`;
-                  }
+                  if (!attachmentPath) return null;
+                  
+                  // Use utility function to resolve URL
+                  const urlInfo = getWorkingAttachmentUrl(attachmentPath);
                   
                   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentPath);
                   
                   if (isImage) {
                     return (
-                      <img 
-                        src={attachmentUrl} 
-                        alt="Lampiran" 
-                        className="w-full max-h-64 object-contain"
-                        onError={(e) => {
-                          // Try alternative paths if initial load fails
-                          const fileName = attachmentPath.split('/').pop();
-                          e.target.src = `/uploads/${fileName}`;
-                          e.target.onerror = () => {
-                            e.target.src = `/storage/${fileName}`;
-                            e.target.onerror = null;
-                          };
-                        }}
-                      />
+                      <div className="relative">
+                        <img 
+                          src={urlInfo.primary} 
+                          alt="Lampiran" 
+                          className="w-full max-h-64 object-contain"
+                          onError={(e) => {
+                            // Try fallback URLs sequentially
+                            const tryNextUrl = () => {
+                              const currentSrc = e.target.src;
+                              const allUrls = [urlInfo.primary, ...urlInfo.fallbacks];
+                              const currentIndex = allUrls.indexOf(currentSrc);
+                              
+                              console.log('Image failed to load:', currentSrc);
+                              console.log('Current index:', currentIndex);
+                              console.log('All available URLs:', allUrls);
+                              
+                              // Try next URL
+                              if (currentIndex + 1 < allUrls.length) {
+                                const nextUrl = allUrls[currentIndex + 1];
+                                console.log('Trying next URL:', nextUrl);
+                                e.target.src = nextUrl;
+                                return;
+                              }
+                              
+                              // If all URLs fail, show placeholder
+                              console.log('All image URLs failed for:', attachmentPath);
+                              e.target.style.display = 'none';
+                              e.target.parentElement.innerHTML = `
+                                <div class="flex items-center justify-center p-8 bg-gray-100 text-gray-500">
+                                  <div class="text-center">
+                                    <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <p class="text-sm">❌ Gambar tidak dapat dimuat</p>
+                                    <p class="text-xs text-red-500 mt-1">File: ${attachmentPath}</p>
+                                    <p class="text-xs text-red-500">Kemungkinan file tidak ada di server</p>
+                                    <details class="mt-2 text-xs">
+                                      <summary class="cursor-pointer text-blue-600">Debug Info</summary>
+                                      <div class="mt-1 text-left">
+                                        <p>URLs yang dicoba:</p>
+                                        ${allUrls.map(url => `<p>• ${url}</p>`).join('')}
+                                      </div>
+                                    </details>
+                                  </div>
+                                </div>
+                              `;
+                            };
+                            
+                            tryNextUrl();
+                          }}
+                          onLoad={() => {
+                            // Log successful load for debugging
+                            console.log('Image loaded successfully:', urlInfo.primary);
+                          }}
+                        />
+                        {/* Show download button for images */}
+                        <div className="absolute top-2 right-2">
+                          <a 
+                            href={urlInfo.primary}
+                            download={report.original.lampiran_original_name || attachmentPath}
+                            className="bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-700 px-2 py-1 rounded text-xs transition-all"
+                            title="Download gambar"
+                          >
+                            ⬇️ Download
+                          </a>
+                        </div>
+                      </div>
                     );
                   } else {
                     return (
                       <a 
-                        href={attachmentUrl}
+                        href={urlInfo.primary}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline text-sm flex items-center gap-2 p-4"
+                        className="text-blue-600 underline text-sm flex items-center gap-2 p-4 hover:bg-gray-50 transition-colors"
+                        onClick={(e) => {
+                          // Try to open the file, if it fails, try fallback URLs
+                          e.preventDefault();
+                          const tryUrls = [urlInfo.primary, ...urlInfo.fallbacks];
+                          
+                          const tryNextUrl = async (index = 0) => {
+                            if (index >= tryUrls.length) {
+                              alert('File tidak dapat diakses. Kemungkinan file telah dipindah atau dihapus.');
+                              return;
+                            }
+                            
+                            try {
+                              const url = tryUrls[index];
+                              const response = await fetch(url, { method: 'HEAD' });
+                              if (response.ok) {
+                                window.open(url, '_blank');
+                                return;
+                              }
+                            } catch (error) {
+                              console.log('Failed to access:', tryUrls[index]);
+                            }
+                            
+                            tryNextUrl(index + 1);
+                          };
+                          
+                          tryNextUrl();
+                        }}
                       >
-                        <FileText className="w-5 h-5" /> Lihat Lampiran
+                        <FileText className="w-5 h-5" /> 
+                        <span>Lihat Lampiran</span>
+                        <span className="text-gray-500">({report.original.lampiran_original_name || attachmentPath})</span>
                       </a>
                     );
                   }

@@ -128,21 +128,51 @@ export default function Dashboard() {
   const fetchDashboardData = async (token) => {
     setIsLoading(true);
     try {
-      const [reportsResponse, usersResponse] = await Promise.all([
-        fetch('/api/proxy?endpoint=laporan', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/proxy?endpoint=user', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      // Try different endpoints/methods to get data
+      let reportsData, usersData;
+      
+      // Try direct API call first
+      try {
+        const [reportsResponse, usersResponse] = await Promise.all([
+          fetch('https://laravel.kasyifana.my.id/api/laporan', {
+            headers: { 
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            mode: 'cors'
+          }),
+          fetch('https://laravel.kasyifana.my.id/api/user', {
+            headers: { 
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            mode: 'cors'
+          })
+        ]);
 
-      if (!reportsResponse.ok || !usersResponse.ok) {
-        throw new Error('Failed to fetch data from the server.');
+        if (reportsResponse.ok) {
+          reportsData = await reportsResponse.json();
+        } else {
+          console.warn('Reports API failed:', reportsResponse.status);
+          // Fallback to empty data
+          reportsData = { data: [] };
+        }
+
+        if (usersResponse.ok) {
+          usersData = await usersResponse.json();
+        } else {
+          console.warn('Users API failed:', usersResponse.status);
+          // Fallback to empty data
+          usersData = { data: [] };
+        }
+      } catch (directApiError) {
+        console.warn('Direct API call failed:', directApiError);
+        // Use empty data as fallback
+        reportsData = { data: [] };
+        usersData = { data: [] };
       }
-
-      const reportsData = await reportsResponse.json();
-      const usersData = await usersResponse.json();
 
       const reports = Array.isArray(reportsData.data) ? reportsData.data : [];
       const users = Array.isArray(usersData.data) ? usersData.data : [];

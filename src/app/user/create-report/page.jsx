@@ -38,6 +38,7 @@ export default function CreateReport() {
 		deskripsi: '',
 		prioritas: '',
 		lampiran: null,
+		lampiranUrl: null, // To store the uploaded file URL
 		generatedFileName: null, // To store the client-generated filename
 		originalFileName: null,  // To store the original filename
 		fileType: null,  // To store the file MIME type
@@ -74,12 +75,14 @@ export default function CreateReport() {
 					return;
 				}
 				
-				// Try the profile endpoint
-				const response = await fetch('/api/proxy?endpoint=profile', {
+				// Try the profile endpoint directly
+				const response = await fetch('https://laravel.kasyifana.my.id/api/profile', {
 					method: 'GET',
 					headers: {
-						'Authorization': `Bearer ${token}`
-					}
+						'Authorization': `Bearer ${token}`,
+						'Accept': 'application/json'
+					},
+					mode: 'cors'
 				});
 				
 				if (response.ok) {
@@ -120,12 +123,14 @@ export default function CreateReport() {
 				} else {
 					console.error('Failed to load user profile:', response.status);
 					
-					// Try the fallback /api/user endpoint
-					const userResponse = await fetch('/api/proxy?endpoint=user', {
+					// Try the fallback /api/user endpoint directly
+					const userResponse = await fetch('https://laravel.kasyifana.my.id/api/user', {
 						method: 'GET',
 						headers: {
-							'Authorization': `Bearer ${token}`
-						}
+							'Authorization': `Bearer ${token}`,
+							'Accept': 'application/json'
+						},
+						mode: 'cors'
 					});
 					
 					if (userResponse.ok) {
@@ -178,7 +183,7 @@ export default function CreateReport() {
 		}));
 	};
 
-	const handleFileChange = (e) => {
+	const handleFileChange = async (e) => {
 		if (e.target.files && e.target.files[0]) {
 			const file = e.target.files[0];
 			
@@ -218,18 +223,46 @@ export default function CreateReport() {
 				}
 			}
 			
-			// Generate a new unique filename
-			const newFileName = `lampiran_${Date.now()}.${fileExtension}`;
-			console.log(`File accepted: ${file.name}, new generated name: ${newFileName}`);
-			
-			setFormData(prev => ({
-				...prev,
-				lampiran: file,
-				originalFileName: file.name,
-				generatedFileName: newFileName, // Store the new name
-				fileExtension: fileExtension,
-				fileType: isVideo && fileExtension === 'mp4' ? 'video/mp4' : file.type // Force correct MIME type for MP4
-			}));
+			// Upload file to public/uploads immediately
+			try {
+				const uploadData = new FormData();
+				uploadData.append('file', file);
+				
+				console.log('Uploading file to public/uploads...');
+				const uploadResponse = await fetch('/api/upload-file', {
+					method: 'POST',
+					body: uploadData,
+				});
+				
+				if (!uploadResponse.ok) {
+					const errorData = await uploadResponse.json();
+					throw new Error(errorData.error || 'Upload failed');
+				}
+				
+				const uploadResult = await uploadResponse.json();
+				console.log('File uploaded successfully:', uploadResult);
+				
+				// DEBUG: Track upload process
+				if (typeof window !== 'undefined' && window.debugFileUpload) {
+					window.debugFileUpload.trackUpload(file, uploadResult);
+				}
+				
+				// Update form data with uploaded file information
+				setFormData(prev => ({
+					...prev,
+					lampiran: file,
+					lampiranUrl: uploadResult.url,
+					originalFileName: file.name,
+					generatedFileName: uploadResult.filename,
+					fileExtension: fileExtension,
+					fileType: isVideo && fileExtension === 'mp4' ? 'video/mp4' : file.type
+				}));
+				
+			} catch (error) {
+				console.error('Upload error:', error);
+				alert(`Gagal mengunggah file: ${error.message}`);
+				return;
+			}
 		}
 	};
 
@@ -297,130 +330,153 @@ export default function CreateReport() {
 			// Set initial status to 'Pending'
 			submissionData.append('status', 'Pending');
 			
-			// Handle file upload
+			// Handle file upload - Send actual file to backend, NOT URL
 			if (formData.lampiran) {
-				// Add the client-generated filename to the form data explicitly
-				submissionData.append('lampiran_filename', formData.generatedFileName);
-
-				// For video files, ensure we explicitly set the correct content type
-				if (formData.fileType && formData.fileType.startsWith('video/')) {
-					try {
-						// Create a new Blob with the correct MIME type
-						const videoBlob = formData.lampiran.slice(0, formData.lampiran.size, 'video/mp4');
-						
-						// Create a new File object with the generated filename and correct content type
-						const videoFile = new File(
-							[videoBlob],
-							formData.generatedFileName, // Use the generated filename
-							{ type: 'video/mp4' }
-						);
-						submissionData.append('lampiran', videoFile);
-						
-						// Add more explicit metadata about the file to help the server process it correctly
-						submissionData.append('file_type', 'video/mp4');
-						submissionData.append('is_video', 'true');
-						submissionData.append('file_extension', formData.fileExtension || 'mp4');
-						
-						// Add field to explicitly indicate this is a file upload
-						submissionData.append('has_attachment', 'true');
-						
-						console.log('Video file being sent with corrected MIME type:', {
-							name: videoFile.name,
-							size: videoFile.size,
-							type: videoFile.type,
-							extension: formData.fileExtension
-						});
-					} catch (error) {
-						console.error('Error preparing video file:', error);
-						// Fallback to original file with generated name
-						const fallbackFile = new File([formData.lampiran], formData.generatedFileName, { type: formData.fileType });
-						submissionData.append('lampiran', fallbackFile);
-						submissionData.append('file_type', formData.fileType);
-						submissionData.append('is_video', 'true');
-					}
-				} else {
-					// For non-video files, create a new File object with the generated name
-					const newFile = new File([formData.lampiran], formData.generatedFileName, { type: formData.fileType });
-					submissionData.append('lampiran', newFile);
-					
-					// Still add the file type as metadata
-					if (formData.fileType) {
-						submissionData.append('file_type', formData.fileType);
-					}
-					if (formData.fileExtension) {
-						submissionData.append('file_extension', formData.fileExtension);
-					}
-					
-					// Add field to explicitly indicate this is a file upload
-					submissionData.append('has_attachment', 'true');
-					
-					console.log('File being sent:', {
-						name: newFile.name,
-						size: newFile.size,
-						type: newFile.type,
-						extension: formData.fileExtension
-					});
+				console.log('✅ Processing file - sending actual file to backend...');
+				
+				// CRITICAL: Use the EXACT same filename that was generated during upload
+				const fileName = formData.generatedFileName;
+				
+				// Validate that we have the generated filename
+				if (!fileName) {
+					throw new Error('Generated filename is missing. Please try uploading the file again.');
 				}
+				
+				// Send actual file to backend (Laravel validation expects File, not URL)
+				submissionData.append('lampiran', formData.lampiran); // Send the actual FILE object
+				
+				// CRITICAL: Backend Laravel expects 'filename' field to use existing filename
+				submissionData.append('filename', fileName); // Use the EXACT filename from upload
+				submissionData.append('lampiran_filename', fileName); // Keep this for backward compatibility
+				submissionData.append('lampiran_original_name', formData.originalFileName);
+				submissionData.append('lampiran_type', formData.fileType);
+				submissionData.append('lampiran_size', formData.lampiran.size.toString());
+				
+				// Add additional metadata to help backend use the same filename
+				submissionData.append('use_existing_filename', 'true'); // Signal to backend to use provided filename
+				submissionData.append('file_already_uploaded', 'true'); // Signal that file is already in public/uploads
+				submissionData.append('skip_file_generation', 'true'); // Explicitly tell backend not to generate new filename
+				
+				console.log('✅ File info prepared:', {
+					filename: fileName,
+					originalName: formData.originalFileName,
+					size: formData.lampiran.size,
+					type: formData.fileType,
+					localUrl: formData.lampiranUrl,
+					useExistingFilename: true,
+					fileAlreadyUploaded: true,
+					skipFileGeneration: true,
+					note: 'Sending filename field to match backend Laravel expectation'
+				});
+				
+				// Double check: log what we're sending
+				console.log('🔍 CRITICAL CHECK: filename field being sent to backend:', fileName);
+				console.log('🔍 CRITICAL CHECK: This should match backend timestamp logic');
+				console.log('🔍 CRITICAL CHECK: File already exists at:', formData.lampiranUrl);
+			} else {
+				console.log('✅ No file to upload');
+				// Don't send lampiran field at all if no file
+				// This should prevent validation error on backend
 			}
 			
 			// For debugging, log important data
-			console.log('Submitting report with user_id:', submissionData.get('user_id'));
+			console.log('✅ Submitting report with user_id:', submissionData.get('user_id'));
+			console.log('✅ Form data keys:', Array.from(submissionData.keys()));
+			
+			// DEBUG: Track form submission
+			if (typeof window !== 'undefined' && window.debugFileUpload) {
+				window.debugFileUpload.trackSubmission(submissionData);
+			}
 			
 			// Get token for authorization header
 			const token = localStorage.getItem('token');
 			
-			// Create a copy of the FormData for our proxy
-			const proxyFormData = new FormData();
+			console.log('✅ Using direct API call to Laravel backend');
+			console.log('✅ Token available:', token ? 'Yes' : 'No');
+			console.log('✅ Has file:', formData.lampiran ? 'Yes' : 'No');
 			
-			// Copy all form data fields to the proxy FormData
+			// Log all form data for debugging
+			console.log('✅ FormData contents:');
 			for (const [key, value] of submissionData.entries()) {
-				proxyFormData.append(key, value);
+				if (value instanceof File) {
+					console.log(`  ${key}: [File] ${value.name} (${value.size} bytes, ${value.type})`);
+				} else {
+					console.log(`  ${key}: ${value}`);
+				}
 			}
 			
-			// Add token to form data for proxy
-			if (token) {
-				proxyFormData.append('auth_token', token);
-			}
-			
-			console.log('Using Next.js API proxy to avoid CORS issues');
-			
-			// Send FormData to our Next.js API proxy to bypass CORS restrictions
-			const response = await fetch('/api/proxy?endpoint=laporan', {
+			// Send FormData directly to Laravel API
+			const response = await fetch('https://laravel.kasyifana.my.id/api/laporan', {
 				method: 'POST',
-				body: proxyFormData
-				// No need for headers, mode, or credentials as this is a same-origin request
+				body: submissionData,
+				headers: {
+					'Authorization': `Bearer ${token}`,
+					// Don't set Content-Type - let browser handle it for FormData
+				},
+				mode: 'cors'
 			});
 			
 			// Handle different status codes with detailed error logging
 			if (!response.ok) {
+				console.error('❌ Response not OK. Status:', response.status);
+				console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()));
+				
 				let errorMessage = `Server responded with status: ${response.status}`;
 				
 				// Always try to get the response text first
 				const responseText = await response.text();
-				console.error('Error response raw text:', responseText);
+				console.error('❌ Error response raw text:', responseText);
 				
 				// Check if it's a 500 Internal Server Error specifically
 				if (response.status === 500) {
-					console.error('500 Internal Server Error detected');
+					console.error('❌ 500 Internal Server Error detected');
+					
+					// Check if it looks like HTML (common error page)
+					if (responseText.trim().startsWith('<!DOCTYPE') || responseText.includes('<html>')) {
+						console.error('❌ Received HTML error page instead of JSON response');
+						errorMessage = `Server error (${response.status}) - Received HTML instead of JSON. This usually indicates a PHP error or server misconfiguration.`;
+						
+						// Look for common error patterns in HTML
+						if (responseText.includes('Fatal error') || responseText.includes('Parse error')) {
+							errorMessage += ' PHP syntax or fatal error detected.';
+						} else if (responseText.includes('Call to undefined function')) {
+							errorMessage += ' Missing PHP function or extension.';
+						} else if (responseText.includes('File not found') || responseText.includes('404')) {
+							errorMessage += ' API endpoint not found.';
+						}
+					} else {
+						// Not HTML, try to parse as JSON
+						try {
+							const errorData = JSON.parse(responseText);
+							if (errorData.message) {
+								errorMessage = errorData.message;
+							}
+						} catch (e) {
+							// Not JSON either, use raw text if short
+							if (responseText.length < 200) {
+								errorMessage += ` - ${responseText}`;
+							}
+						}
+					}
 					
 					// Log more specific debugging information for PHP errors
 					if (responseText.includes('Call to undefined function') || 
 						responseText.includes('Fatal error') ||
 						responseText.includes('Warning') ||
 						responseText.includes('Notice')) {
-						console.error('PHP error detected in response. PHP error details may be found in responseText above.');
+						console.error('❌ PHP error detected in response. PHP error details may be found in responseText above.');
 					}
 				}
 				
 				// Check if it's a 422 Validation Error specifically
 				if (response.status === 422) {
-					console.error('422 Validation Error detected. This typically means the file or data was rejected by the server.');
+					console.error('❌ 422 Validation Error detected. This typically means the file or data was rejected by the server.');
 					
 					try {
 						// Try to parse the validation errors if they're in a structured format
 						const errorData = JSON.parse(responseText);
 						if (errorData.errors) {
-							console.error('Validation error details:', errorData.errors);
+							console.error('❌ Validation error details:', errorData.errors);
 							
 							// Check for specific file-related validation errors
 							if (errorData.errors.lampiran) {
@@ -432,25 +488,28 @@ export default function CreateReport() {
 					}
 				}
 				
-				// Check if it looks like HTML (common error page)
-				if (responseText.trim().startsWith('<!DOCTYPE') || responseText.includes('<html>')) {
-					console.error('Received HTML error page instead of JSON response');
-					errorMessage = `Server error (${response.status}) - Received HTML instead of JSON.`;
-				} else {
-					// Try to parse as JSON
-					try {
-						const errorData = JSON.parse(responseText);
-						console.error('Error response as JSON:', errorData);
-						
-						if (errorData.message) {
-							errorMessage = errorData.message;
-						} else if (errorData.error) {
-							errorMessage = errorData.error;
-						}
-					} catch (jsonError) {
-						// Not JSON, use the text as is if it's not too long
-						if (responseText.length < 100) {
-							errorMessage += ` - ${responseText}`;
+				// For other errors (not 500, not 422), try to parse response
+				if (response.status !== 500 && response.status !== 422) {
+					// Check if it looks like HTML (common error page)
+					if (responseText.trim().startsWith('<!DOCTYPE') || responseText.includes('<html>')) {
+						console.error('❌ Received HTML error page instead of JSON response');
+						errorMessage = `Server error (${response.status}) - Received HTML instead of JSON.`;
+					} else {
+						// Try to parse as JSON
+						try {
+							const errorData = JSON.parse(responseText);
+							console.error('❌ Error response as JSON:', errorData);
+							
+							if (errorData.message) {
+								errorMessage = errorData.message;
+							} else if (errorData.error) {
+								errorMessage = errorData.error;
+							}
+						} catch (jsonError) {
+							// Not JSON, use the text as is if it's not too long
+							if (responseText.length < 100) {
+								errorMessage += ` - ${responseText}`;
+							}
 						}
 					}
 				}
@@ -458,29 +517,39 @@ export default function CreateReport() {
 				throw new Error(errorMessage);
 			}
 			
+			console.log('✅ Response OK! Status:', response.status);
+			console.log('✅ Response headers:', Object.fromEntries(response.headers.entries()));
+			
 			// Process the response
 			let result;
 			try {
 				result = await response.json();
-				console.log("Report created successfully:", result);
+				console.log("✅ Report created successfully:", result);
+				
+				// DEBUG: Check database after submission
+				if (typeof window !== 'undefined' && window.debugFileUpload && result.id) {
+					setTimeout(() => {
+						window.debugFileUpload.checkDatabase(result.id);
+					}, 1000); // Wait 1 second for database to update
+				}
 				
 				// Log and store file path information if available
 				if (result.localFilePath) {
-					console.log("Local file path:", result.localFilePath);
+					console.log("✅ Local file path:", result.localFilePath);
 				}
 				
 				// The server might still send back its own filename, which we can log.
 				if (result.localFileName) {
-					console.log("Filename from server:", result.localFileName);
+					console.log("✅ Filename from server:", result.localFileName);
 				}
 				
 				// Log all fields returned from the server to help debugging
-				console.log("All fields returned from server:");
+				console.log("✅ All fields returned from server:");
 				Object.keys(result).forEach(key => {
 					console.log(`- ${key}: ${result[key]}`);
 				});
 			} catch (jsonErr) {
-				console.log("Report submitted successfully, response was not JSON");
+				console.log("✅ Report submitted successfully, response was not JSON");
 			}
 			
 			// Show success notification modal
@@ -493,6 +562,7 @@ export default function CreateReport() {
 				deskripsi: '',
 				prioritas: '',
 				lampiran: null,
+				lampiranUrl: null,
 				generatedFileName: null,
 				originalFileName: null,
 				fileType: null,
@@ -539,8 +609,84 @@ export default function CreateReport() {
     `;
 		document.head.appendChild(style);
 
+		// Add debugging script
+		const debugScript = document.createElement('script');
+		debugScript.innerHTML = `
+			window.debugFileUpload = {
+				trackUpload: (file, uploadResult) => {
+					console.log('🔍 DEBUG: File Upload Tracking');
+					console.log('Original file name:', file.name);
+					console.log('File size:', file.size);
+					console.log('File type:', file.type);
+					console.log('Upload result:', uploadResult);
+					console.log('Generated filename:', uploadResult.filename);
+					console.log('Upload URL:', uploadResult.url);
+					
+					sessionStorage.setItem('debug_upload_original', file.name);
+					sessionStorage.setItem('debug_upload_generated', uploadResult.filename);
+					sessionStorage.setItem('debug_upload_url', uploadResult.url);
+				},
+				
+				trackSubmission: (formData) => {
+					console.log('🔍 DEBUG: Form Submission Tracking');
+					console.log('Form data entries:');
+					for (const [key, value] of formData.entries()) {
+						if (value instanceof File) {
+							console.log(key + ': [File] ' + value.name + ' (' + value.size + ' bytes)');
+						} else {
+							console.log(key + ': ' + value);
+						}
+					}
+					
+					const uploadOriginal = sessionStorage.getItem('debug_upload_original');
+					const uploadGenerated = sessionStorage.getItem('debug_upload_generated');
+					const formFilename = formData.get('lampiran_filename');
+					
+					console.log('🔍 DEBUG: Filename Comparison');
+					console.log('Upload original:', uploadOriginal);
+					console.log('Upload generated:', uploadGenerated);
+					console.log('Form filename:', formFilename);
+					console.log('Match?', uploadGenerated === formFilename);
+				},
+				
+				checkDatabase: async (reportId) => {
+					try {
+						const token = localStorage.getItem('token');
+						const response = await fetch('https://laravel.kasyifana.my.id/api/laporan/' + reportId, {
+							headers: {
+								'Authorization': 'Bearer ' + token,
+								'Accept': 'application/json'
+							}
+						});
+						
+						if (response.ok) {
+							const report = await response.json();
+							console.log('🔍 DEBUG: Database Check');
+							console.log('Report data:', report);
+							console.log('Lampiran field:', report.lampiran);
+							console.log('Lampiran_filename field:', report.lampiran_filename);
+							console.log('Original name field:', report.lampiran_original_name);
+							
+							const uploadGenerated = sessionStorage.getItem('debug_upload_generated');
+							console.log('🔍 DEBUG: Database vs Upload Comparison');
+							console.log('Upload generated:', uploadGenerated);
+							console.log('DB lampiran:', report.lampiran);
+							console.log('DB lampiran_filename:', report.lampiran_filename);
+							console.log('Match lampiran?', uploadGenerated === report.lampiran);
+							console.log('Match lampiran_filename?', uploadGenerated === report.lampiran_filename);
+						}
+					} catch (error) {
+						console.error('Error checking database:', error);
+					}
+				}
+			};
+			console.log('🔍 DEBUG: File upload debugging tools loaded');
+		`;
+		document.head.appendChild(debugScript);
+
 		return () => {
 			document.head.removeChild(style);
+			document.head.removeChild(debugScript);
 		};
 	}, []);
 
@@ -683,15 +829,61 @@ export default function CreateReport() {
 									<Upload className="mr-2 h-4 w-4" />
 									Unggah File
 								</Button>
-								{formData.lampiran ? (
-									<div className="mt-2 text-sm">
-										<p className="font-medium text-green-600">File dipilih: {formData.lampiran.name}</p>
-										<p className="text-gray-500">Ukuran: {(formData.lampiran.size / (1024 * 1024)).toFixed(2)} MB</p>
+								{formData.lampiran && formData.lampiranUrl ? (
+									<div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+										<div className="text-sm space-y-2">
+											<p className="font-medium text-green-700">✅ File berhasil diunggah:</p>
+											<p className="text-gray-700">📄 {formData.originalFileName}</p>
+											<p className="text-gray-600">💾 Ukuran: {(formData.lampiran.size / (1024 * 1024)).toFixed(2)} MB</p>
+											<p className="text-gray-600">🔗 URL: {formData.lampiranUrl}</p>
+											
+											{/* Preview for images */}
+											{formData.fileType?.startsWith('image/') && (
+												<div className="mt-3">
+													<p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
+													<img 
+														src={formData.lampiranUrl} 
+														alt="Preview" 
+														className="max-w-full max-h-48 object-contain rounded border"
+													/>
+												</div>
+											)}
+											
+											{/* Preview for PDFs */}
+											{formData.fileType === 'application/pdf' && (
+												<div className="mt-3">
+													<p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
+													<a 
+														href={formData.lampiranUrl} 
+														target="_blank" 
+														rel="noopener noreferrer"
+														className="text-blue-600 hover:text-blue-800 underline"
+													>
+														📄 Buka PDF
+													</a>
+												</div>
+											)}
+											
+											{/* Preview for videos */}
+											{formData.fileType?.startsWith('video/') && (
+												<div className="mt-3">
+													<p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
+													<video 
+														src={formData.lampiranUrl} 
+														controls 
+														className="max-w-full max-h-48 rounded border"
+													>
+														Browser Anda tidak mendukung video.
+													</video>
+												</div>
+											)}
+										</div>
 									</div>
 								) : (
 									<p className="text-sm text-gray-500 mt-2">
 										Klik untuk memilih file dari perangkat Anda<br/>
-										Mendukung: JPG, PNG, PDF (Max. 10MB), MP4 (Max. 2MB)
+										Mendukung: JPG, PNG, PDF (Max. 10MB), MP4 (Max. 2MB)<br/>
+										<span className="text-xs text-blue-600">File akan disimpan di folder public/uploads</span>
 									</p>
 								)}
 							</div>

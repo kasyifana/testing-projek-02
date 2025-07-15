@@ -109,7 +109,6 @@ export async function GET(request) {
     // Get authorization from request headers
     const authHeader = request.headers.get('authorization');
     
-    
     // Get the URL from the request to determine which endpoint to call
     const url = new URL(request.url);
     const endpoint = url.searchParams.get('endpoint') || 'profile';

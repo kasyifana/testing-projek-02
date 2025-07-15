@@ -37,13 +37,13 @@ function checkPath(path) {
   console.log('\nBrowser URL resolution:');
 
   // 1. Basic path as stored
-  console.log(`1. Direct path: http://localhost:9002${path.startsWith('/') ? path : `/${path}`}`);
+  console.log(`1. Direct path: https://laravel.kasyifana.my.id${path.startsWith('/') ? path : `/${path}`}`);
   
   // 2. With /uploads/ prefix
-  console.log(`2. With uploads: http://localhost:9002/uploads/${path.split('/').pop()}`);
+  console.log(`2. With uploads: https://laravel.kasyifana.my.id/uploads/${path.split('/').pop()}`);
   
   // 3. With /storage/ prefix
-  console.log(`3. With storage: http://localhost:9002/storage/${path.split('/').pop()}`);
+  console.log(`3. With storage: https://laravel.kasyifana.my.id/storage/${path.split('/').pop()}`);
 
   console.log('----------------------------------');
 }

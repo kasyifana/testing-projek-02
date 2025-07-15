@@ -172,14 +172,16 @@ export default function Dashboard() {
       
       // The Laravel API doesn't have a /laporan/user/{id} endpoint consistently available
       // Instead, we'll query all reports and filter by user_id on the client
-      const apiUrl = '/api/proxy?endpoint=laporan';
+      const apiUrl = 'https://laravel.kasyifana.my.id/api/laporan';
       
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        mode: 'cors'
       });
       
       if (!response.ok) {

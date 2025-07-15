@@ -80,11 +80,13 @@ export default function Notifications() {
         return;
       }
       
-      const response = await fetch('/api/proxy?endpoint=profile', {
+      const response = await fetch('https://laravel.kasyifana.my.id/api/profile', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        },
+        mode: 'cors'
       });
       
       if (response.ok) {
@@ -145,14 +147,16 @@ export default function Notifications() {
         throw new Error('Token tidak ditemukan');
       }
 
-      const apiUrl = `/api/proxy?endpoint=laporan`;
+      const apiUrl = `https://laravel.kasyifana.my.id/api/laporan`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
           'Content-Type': 'application/json'
-        }
+        },
+        mode: 'cors'
       });
 
       if (!response.ok) {

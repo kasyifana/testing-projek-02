@@ -30,18 +30,19 @@ export function useLogoutHandler() {
     
     // Attempt to log out on the server, but don't wait for completion or let errors block the process
     if (token) {
-      // First try the proxy endpoint (which might handle errors better)
-      fetch('/api/proxy?endpoint=logout', {
+      // Try direct logout endpoint
+      fetch('https://laravel.kasyifana.my.id/api/logout', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
+        mode: 'cors'
         // Don't use await - we don't want errors to stop the local logout
       }).catch(error => {
         // Silently catch - we'll proceed with local logout regardless
-        console.log('Proxy logout error (continuing with local logout):', error);
+        console.log('Logout error (continuing with local logout):', error);
       });
       
       // Also try the direct endpoint as a backup, but with a timeout to prevent hanging
