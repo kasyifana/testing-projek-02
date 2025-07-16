@@ -229,7 +229,7 @@ export default function CreateReport() {
 				uploadData.append('file', file);
 				
 				console.log('Uploading file to public/uploads...');
-				const uploadResponse = await fetch('/api/laporan', {
+				const uploadResponse = await fetch('https://laravel.kasyifana.my.id/api/laporan', {
 					method: 'POST',
 					body: uploadData,
 				});
