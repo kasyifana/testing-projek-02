@@ -55,9 +55,10 @@ const formatDateTime = (dateString, timeString) => {
 };
 
 // Optimized function to get working attachment URL with fallbacks
-// Priority: public/uploads (where files actually are) > public/storage > other paths
+// Now using Laravel API endpoint for attachments
 const getWorkingAttachmentUrl = (() => {
   const cache = new Map();
+  const LARAVEL_API_BASE = 'https://laravel.kasyifana.my.id';
   
   return (attachmentPath) => {
     if (!attachmentPath) return null;
@@ -83,38 +84,42 @@ const getWorkingAttachmentUrl = (() => {
     // Create unique paths using Set to avoid duplicates
     const pathSet = new Set();
     
-    // PRIORITY 1: Direct uploads paths (most likely to work)
+    // PRIORITY 1: Laravel API direct access (most reliable)
+    pathSet.add(`${LARAVEL_API_BASE}/uploads/${fileName}`);
+    pathSet.add(`${LARAVEL_API_BASE}/storage/app/public/uploads/${fileName}`);
+    
+    // PRIORITY 2: Direct uploads paths (fallback)
     pathSet.add(`/uploads/${fileName}`);
     pathSet.add(`/public/uploads/${fileName}`);
     
-    // PRIORITY 2: Handle original path if it contains uploads
+    // PRIORITY 3: Handle original path with Laravel base if it contains uploads
     if (attachmentPath.includes('/uploads/')) {
+      pathSet.add(`${LARAVEL_API_BASE}${attachmentPath.startsWith('/') ? '' : '/'}${attachmentPath}`);
       pathSet.add(attachmentPath);
     }
     
-    // PRIORITY 3: Storage paths (future use)
+    // PRIORITY 4: Storage paths via Laravel API
+    pathSet.add(`${LARAVEL_API_BASE}/storage/${fileName}`);
+    pathSet.add(`${LARAVEL_API_BASE}/storage/app/public/${fileName}`);
+    
+    // PRIORITY 5: Local storage paths (fallback)
     pathSet.add(`/storage/${fileName}`);
     pathSet.add(`/public/storage/${fileName}`);
-    
-    // PRIORITY 4: Handle original path if it contains storage
-    if (attachmentPath.includes('/storage/')) {
-      pathSet.add(attachmentPath);
-    }
-    
-    // PRIORITY 5: Relative paths
-    pathSet.add(`./uploads/${fileName}`);
-    pathSet.add(`./public/uploads/${fileName}`);
-    pathSet.add(`./storage/${fileName}`);
-    pathSet.add(`./public/storage/${fileName}`);
     
     // Convert Set to Array and remove duplicates
     const uniquePaths = Array.from(pathSet);
     
-    // Create result object
+    // Create result object with Laravel API primary and other paths as fallbacks
     const result = {
       primary: uniquePaths[0],
       fallbacks: uniquePaths.slice(1)
     };
+    
+    // Log for debugging
+    console.log(`Attachment URL resolved for ${fileName}:`, {
+      primary: result.primary,
+      fallbacks: result.fallbacks.length > 0 ? `${result.fallbacks.length} fallbacks` : 'No fallbacks'
+    });
     
     // Cache the result
     cache.set(attachmentPath, result);
