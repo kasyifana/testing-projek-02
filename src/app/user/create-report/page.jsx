@@ -223,48 +223,44 @@ export default function CreateReport() {
 				}
 			}
 			
-			// Prepare file for submission to Laravel backend (no pre-upload)
+			// Upload file to public/uploads immediately
 			try {
-				// Generate filename locally using timestamp approach similar to Laravel
-				const timestamp = Date.now();
-				const generatedFileName = `lampiran_${timestamp}.${fileExtension}`;
+				const uploadData = new FormData();
+				uploadData.append('file', file);
 				
-				// Create blob URL for preview
-				const blobUrl = URL.createObjectURL(file);
-				
-				console.log('File prepared for Laravel submission:', {
-					originalName: file.name,
-					generatedName: generatedFileName,
-					size: file.size,
-					type: file.type,
-					extension: fileExtension
+				console.log('Uploading file to public/uploads...');
+				const uploadResponse = await fetch('/api/upload-file', {
+					method: 'POST',
+					body: uploadData,
 				});
 				
-				// DEBUG: Track file preparation
-				if (typeof window !== 'undefined' && window.debugFileUpload) {
-					window.debugFileUpload.trackUpload(file, {
-						filename: generatedFileName,
-						url: blobUrl,
-						originalName: file.name
-					});
+				if (!uploadResponse.ok) {
+					const errorData = await uploadResponse.json();
+					throw new Error(errorData.error || 'Upload failed');
 				}
 				
-				// Update form data with file information (file will be uploaded to Laravel on form submission)
+				const uploadResult = await uploadResponse.json();
+				console.log('File uploaded successfully:', uploadResult);
+				
+				// DEBUG: Track upload process
+				if (typeof window !== 'undefined' && window.debugFileUpload) {
+					window.debugFileUpload.trackUpload(file, uploadResult);
+				}
+				
+				// Update form data with uploaded file information
 				setFormData(prev => ({
 					...prev,
 					lampiran: file,
-					lampiranUrl: blobUrl, // Use blob URL for preview
+					lampiranUrl: uploadResult.url,
 					originalFileName: file.name,
-					generatedFileName: generatedFileName,
+					generatedFileName: uploadResult.filename,
 					fileExtension: fileExtension,
 					fileType: isVideo && fileExtension === 'mp4' ? 'video/mp4' : file.type
 				}));
 				
-				console.log('✅ File prepared successfully. Will be uploaded to Laravel when form is submitted.');
-				
 			} catch (error) {
-				console.error('File preparation error:', error);
-				alert(`Gagal mempersiapkan file: ${error.message}`);
+				console.error('Upload error:', error);
+				alert(`Gagal mengunggah file: ${error.message}`);
 				return;
 			}
 		}
@@ -334,32 +330,32 @@ export default function CreateReport() {
 			// Set initial status to 'Pending'
 			submissionData.append('status', 'Pending');
 			
-			// Handle file upload - Send actual file to Laravel backend
+			// Handle file upload - Send actual file to backend, NOT URL
 			if (formData.lampiran) {
-				console.log('✅ Processing file - sending actual file to Laravel backend...');
+				console.log('✅ Processing file - sending actual file to backend...');
 				
-				// Use the filename that was generated during file selection
+				// CRITICAL: Use the EXACT same filename that was generated during upload
 				const fileName = formData.generatedFileName;
 				
 				// Validate that we have the generated filename
 				if (!fileName) {
-					throw new Error('Generated filename is missing. Please try selecting the file again.');
+					throw new Error('Generated filename is missing. Please try uploading the file again.');
 				}
 				
-				// Send actual file to Laravel backend
+				// Send actual file to backend (Laravel validation expects File, not URL)
 				submissionData.append('lampiran', formData.lampiran); // Send the actual FILE object
 				
-				// Laravel backend expects these fields for file handling
-				submissionData.append('filename', fileName); // Suggested filename
-				submissionData.append('lampiran_filename', fileName); // For backward compatibility
+				// CRITICAL: Backend Laravel expects 'filename' field to use existing filename
+				submissionData.append('filename', fileName); // Use the EXACT filename from upload
+				submissionData.append('lampiran_filename', fileName); // Keep this for backward compatibility
 				submissionData.append('lampiran_original_name', formData.originalFileName);
 				submissionData.append('lampiran_type', formData.fileType);
 				submissionData.append('lampiran_size', formData.lampiran.size.toString());
 				
-				// Add metadata to help Laravel backend process the file
-				submissionData.append('use_existing_filename', 'false'); // Laravel will handle filename generation
-				submissionData.append('file_already_uploaded', 'false'); // File will be uploaded during submission
-				submissionData.append('skip_file_generation', 'false'); // Let Laravel handle filename generation
+				// Add additional metadata to help backend use the same filename
+				submissionData.append('use_existing_filename', 'true'); // Signal to backend to use provided filename
+				submissionData.append('file_already_uploaded', 'true'); // Signal that file is already in public/uploads
+				submissionData.append('skip_file_generation', 'true'); // Explicitly tell backend not to generate new filename
 				
 				console.log('✅ File info prepared:', {
 					filename: fileName,
@@ -367,16 +363,16 @@ export default function CreateReport() {
 					size: formData.lampiran.size,
 					type: formData.fileType,
 					localUrl: formData.lampiranUrl,
-					useExistingFilename: false,
-					fileAlreadyUploaded: false,
-					skipFileGeneration: false,
-					note: 'File will be uploaded directly to Laravel backend'
+					useExistingFilename: true,
+					fileAlreadyUploaded: true,
+					skipFileGeneration: true,
+					note: 'Sending filename field to match backend Laravel expectation'
 				});
 				
 				// Double check: log what we're sending
 				console.log('🔍 CRITICAL CHECK: filename field being sent to backend:', fileName);
-				console.log('🔍 CRITICAL CHECK: This should match Laravel timestamp logic');
-				console.log('🔍 CRITICAL CHECK: File will be uploaded during form submission, not pre-uploaded');
+				console.log('🔍 CRITICAL CHECK: This should match backend timestamp logic');
+				console.log('🔍 CRITICAL CHECK: File already exists at:', formData.lampiranUrl);
 			} else {
 				console.log('✅ No file to upload');
 				// Don't send lampiran field at all if no file
@@ -558,11 +554,6 @@ export default function CreateReport() {
 			
 			// Show success notification modal
 			setShowSuccessModal(true);
-			
-			// Clean up blob URL if it exists
-			if (formData.lampiranUrl && formData.lampiranUrl.startsWith('blob:')) {
-				URL.revokeObjectURL(formData.lampiranUrl);
-			}
 			
 			// Reset form after submission
 			setFormData({
@@ -892,7 +883,7 @@ export default function CreateReport() {
 									<p className="text-sm text-gray-500 mt-2">
 										Klik untuk memilih file dari perangkat Anda<br/>
 										Mendukung: JPG, PNG, PDF (Max. 10MB), MP4 (Max. 2MB)<br/>
-										<span className="text-xs text-blue-600">File akan diupload ke server Laravel saat laporan dikirim</span>
+										<span className="text-xs text-blue-600">File akan disimpan di folder public/uploads</span>
 									</p>
 								)}
 							</div>
