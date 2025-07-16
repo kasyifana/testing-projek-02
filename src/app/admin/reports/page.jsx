@@ -68,14 +68,44 @@ const getWorkingAttachmentUrl = (() => {
       return cache.get(attachmentPath);
     }
     
-    // If it's already a complete URL, return as is
+    // If it's already a complete URL, check if it's using the old domain
     if (attachmentPath.startsWith('http')) {
+      // Check if it's using the old domain (laporkampus.kasyifana.my.id)
+      if (attachmentPath.includes('laporkampus.kasyifana.my.id')) {
+        // Replace old domain with new Laravel API domain
+        console.log('⚠️ Found old domain URL:', attachmentPath);
+        
+        // Get the path part of the URL (everything after the domain)
+        const urlObj = new URL(attachmentPath);
+        const pathPart = urlObj.pathname; // e.g., "/uploads/lampiran_123.png"
+        
+        // Create a new URL with the Laravel API domain
+        const newUrl = `${LARAVEL_API_BASE}${pathPart}`;
+        console.log('🔄 Replacing with new URL:', newUrl);
+        
+        const result = {
+          primary: newUrl,
+          fallbacks: [attachmentPath] // Keep old URL as fallback
+        };
+        cache.set(attachmentPath, result);
+        return result;
+      }
+      
+      // For other complete URLs, return as is
       const result = {
         primary: attachmentPath,
         fallbacks: []
       };
       cache.set(attachmentPath, result);
       return result;
+    }
+    
+    // Check if path contains the old domain name as a string (not a full URL)
+    if (attachmentPath.includes('laporkampus.kasyifana.my.id') && !attachmentPath.startsWith('http')) {
+      console.log('⚠️ Found path with old domain reference:', attachmentPath);
+      // Replace any references to the old domain
+      attachmentPath = attachmentPath.replace('laporkampus.kasyifana.my.id', 'laravel.kasyifana.my.id');
+      console.log('🔄 Updated path:', attachmentPath);
     }
     
     // Extract filename from path
@@ -115,11 +145,18 @@ const getWorkingAttachmentUrl = (() => {
       fallbacks: uniquePaths.slice(1)
     };
     
-    // Log for debugging
-    console.log(`Attachment URL resolved for ${fileName}:`, {
+    // Enhanced logging for debugging
+    console.log(`🔍 Attachment URL resolved for ${fileName}:`, {
       primary: result.primary,
-      fallbacks: result.fallbacks.length > 0 ? `${result.fallbacks.length} fallbacks` : 'No fallbacks'
+      fallbacks: result.fallbacks.slice(0, 3), // Show first 3 fallbacks
+      totalFallbacks: result.fallbacks.length
     });
+    
+    // Add a warning if URL contains laporkampus.kasyifana.my.id
+    if (result.primary.includes('laporkampus.kasyifana.my.id') || 
+        result.fallbacks.some(url => url.includes('laporkampus.kasyifana.my.id'))) {
+      console.warn('⚠️ WARNING: Detected old domain (laporkampus.kasyifana.my.id) in attachment URLs!');
+    }
     
     // Cache the result
     cache.set(attachmentPath, result);
@@ -383,12 +420,21 @@ export default function ReportsManagement() {
           }];
         }
         
+        // Helper function to fix URLs with old domain
+        const fixOldDomainUrl = (url) => {
+          if (typeof url === 'string' && url.includes('laporkampus.kasyifana.my.id')) {
+            console.warn('🔄 Fixing old domain URL in API response:', url);
+            return url.replace('laporkampus.kasyifana.my.id', 'laravel.kasyifana.my.id');
+          }
+          return url;
+        };
+        
         // Enhanced original data processing for attachments
         const enhancedOriginal = {
           ...report,
-          // Handle attachment files - check multiple possible fields
-          lampiran: report.lampiran || report.lampiran_filename || report.attachment || null,
-          lampiran_filename: report.lampiran_filename || report.lampiran || report.attachment || null,
+          // Handle attachment files - check multiple possible fields and fix old domain URLs
+          lampiran: fixOldDomainUrl(report.lampiran || report.lampiran_filename || report.attachment || null),
+          lampiran_filename: fixOldDomainUrl(report.lampiran_filename || report.lampiran || report.attachment || null),
           lampiran_original_name: report.lampiran_original_name || report.original_filename || null,
           lampiran_type: report.lampiran_type || report.file_type || null,
           lampiran_size: report.lampiran_size || report.file_size || null
@@ -1429,13 +1475,32 @@ function ExpandableReportCard({
                             // Try fallback URLs sequentially
                             const tryNextUrl = () => {
                               const currentSrc = e.target.src;
+                              
+                              // Special handling for old domain URLs
+                              if (currentSrc.includes('laporkampus.kasyifana.my.id')) {
+                                console.error('🚨 CRITICAL: Image failed with old domain URL:', currentSrc);
+                                
+                                // Try to directly fix the URL by replacing the domain
+                                const fixedUrl = currentSrc.replace(
+                                  'laporkampus.kasyifana.my.id', 
+                                  'laravel.kasyifana.my.id'
+                                );
+                                console.log('🔄 Attempting domain fix. Trying:', fixedUrl);
+                                
+                                // Apply the fixed URL immediately
+                                e.target.src = fixedUrl;
+                                return; // Exit function and let the fixed URL attempt to load
+                              }
+                              
+                              // Normal fallback handling
                               const allUrls = [urlInfo.primary, ...urlInfo.fallbacks];
                               const currentIndex = allUrls.indexOf(currentSrc);
                               
-                              // Only log the first failure to avoid spam
+                              // Enhanced error logging
                               if (currentIndex === 0) {
-                                console.log('Image failed to load:', currentSrc);
-                                console.log('Trying fallback URLs...');
+                                console.log('❌ Image failed to load:', currentSrc);
+                                console.log('📋 All available URLs:', allUrls);
+                                console.log('🔄 Trying fallback URLs...');
                               }
                               
                               // Try next URL
@@ -1445,8 +1510,10 @@ function ExpandableReportCard({
                                 return;
                               }
                               
-                              // If all URLs fail, show placeholder
-                              console.log('All image URLs failed for:', attachmentPath);
+                              // If all URLs fail, show placeholder with enhanced debugging
+                              console.error('❌ All image URLs failed for:', attachmentPath);
+                              console.table(allUrls); // Show all URLs in table format for easier debugging
+                              
                               e.target.style.display = 'none';
                               e.target.parentElement.innerHTML = `
                                 <div class="flex items-center justify-center p-8 bg-gray-100 text-gray-500">
@@ -1457,11 +1524,15 @@ function ExpandableReportCard({
                                     <p class="text-sm">❌ Gambar tidak dapat dimuat</p>
                                     <p class="text-xs text-red-500 mt-1">File: ${attachmentPath}</p>
                                     <p class="text-xs text-red-500">Kemungkinan file tidak ada di server</p>
-                                    <details class="mt-2 text-xs">
+                                    <details class="mt-2 text-xs" open>
                                       <summary class="cursor-pointer text-blue-600">Debug Info</summary>
                                       <div class="mt-1 text-left">
-                                        <p>URLs yang dicoba:</p>
-                                        ${allUrls.map(url => `<p>• ${url}</p>`).join('')}
+                                        <p class="font-bold">URLs yang dicoba:</p>
+                                        ${allUrls.map((url, i) => 
+                                          `<p style="color:${url.includes('laporkampus') ? 'red' : 'inherit'}">
+                                            ${i+1}. ${url} ${url.includes('laporkampus') ? '⚠️ Domain lama!' : ''}
+                                           </p>`
+                                        ).join('')}
                                       </div>
                                     </details>
                                   </div>
