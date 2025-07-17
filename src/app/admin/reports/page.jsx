@@ -54,8 +54,7 @@ const formatDateTime = (dateString, timeString) => {
   return date.toLocaleDateString('id-ID', options);
 };
 
-// Optimized function to get working attachment URL with fallbacks
-// Now using Laravel API endpoint for attachments
+// Optimized function to get working attachment URL using Laravel API endpoint
 const getWorkingAttachmentUrl = (() => {
   const cache = new Map();
   const LARAVEL_API_BASE = 'https://laravel.kasyifana.my.id';
@@ -72,7 +71,7 @@ const getWorkingAttachmentUrl = (() => {
     if (attachmentPath.startsWith('http')) {
       // Check if it's using the old domain (laporkampus.kasyifana.my.id)
       if (attachmentPath.includes('laporkampus.kasyifana.my.id')) {
-        // Replace old domain with new Laravel API domain
+        // Replace old domain with Laravel API domain
         console.log('⚠️ Found old domain URL:', attachmentPath);
         
         // Get the path part of the URL (everything after the domain)
@@ -81,11 +80,11 @@ const getWorkingAttachmentUrl = (() => {
         
         // Create a new URL with the Laravel API domain
         const newUrl = `${LARAVEL_API_BASE}${pathPart}`;
-        console.log('🔄 Replacing with new URL:', newUrl);
+        console.log('🔄 Replacing with Laravel API URL:', newUrl);
         
         const result = {
           primary: newUrl,
-          fallbacks: [attachmentPath] // Keep old URL as fallback
+          fallbacks: [] // No need for fallbacks since we're using only Laravel API
         };
         cache.set(attachmentPath, result);
         return result;
@@ -100,10 +99,9 @@ const getWorkingAttachmentUrl = (() => {
       return result;
     }
     
-    // Check if path contains the old domain name as a string (not a full URL)
-    if (attachmentPath.includes('laporkampus.kasyifana.my.id') && !attachmentPath.startsWith('http')) {
+    // Replace any references to the old domain
+    if (attachmentPath.includes('laporkampus.kasyifana.my.id')) {
       console.log('⚠️ Found path with old domain reference:', attachmentPath);
-      // Replace any references to the old domain
       attachmentPath = attachmentPath.replace('laporkampus.kasyifana.my.id', 'laravel.kasyifana.my.id');
       console.log('🔄 Updated path:', attachmentPath);
     }
@@ -114,27 +112,18 @@ const getWorkingAttachmentUrl = (() => {
     // Create unique paths using Set to avoid duplicates
     const pathSet = new Set();
     
-    // PRIORITY 1: Laravel API direct access (most reliable)
+    // PRIORITY 1: Laravel API direct access paths
     pathSet.add(`${LARAVEL_API_BASE}/uploads/${fileName}`);
     pathSet.add(`${LARAVEL_API_BASE}/storage/app/public/uploads/${fileName}`);
     
-    // PRIORITY 2: Direct uploads paths (fallback)
-    pathSet.add(`/uploads/${fileName}`);
-    pathSet.add(`/public/uploads/${fileName}`);
-    
-    // PRIORITY 3: Handle original path with Laravel base if it contains uploads
+    // PRIORITY 2: Handle original path with Laravel base if it contains uploads
     if (attachmentPath.includes('/uploads/')) {
       pathSet.add(`${LARAVEL_API_BASE}${attachmentPath.startsWith('/') ? '' : '/'}${attachmentPath}`);
-      pathSet.add(attachmentPath);
     }
     
-    // PRIORITY 4: Storage paths via Laravel API
+    // PRIORITY 3: Additional Laravel API storage paths
     pathSet.add(`${LARAVEL_API_BASE}/storage/${fileName}`);
     pathSet.add(`${LARAVEL_API_BASE}/storage/app/public/${fileName}`);
-    
-    // PRIORITY 5: Local storage paths (fallback)
-    pathSet.add(`/storage/${fileName}`);
-    pathSet.add(`/public/storage/${fileName}`);
     
     // Convert Set to Array and remove duplicates
     const uniquePaths = Array.from(pathSet);
@@ -148,13 +137,12 @@ const getWorkingAttachmentUrl = (() => {
     // Enhanced logging for debugging
     console.log(`🔍 Attachment URL resolved for ${fileName}:`, {
       primary: result.primary,
-      fallbacks: result.fallbacks.slice(0, 3), // Show first 3 fallbacks
+      fallbacks: result.fallbacks.slice(0, 2), // Show first 2 fallbacks if any
       totalFallbacks: result.fallbacks.length
     });
     
-    // Add a warning if URL contains laporkampus.kasyifana.my.id
-    if (result.primary.includes('laporkampus.kasyifana.my.id') || 
-        result.fallbacks.some(url => url.includes('laporkampus.kasyifana.my.id'))) {
+    // Add a warning if URL still contains laporkampus.kasyifana.my.id
+    if (result.primary.includes('laporkampus.kasyifana.my.id')) {
       console.warn('⚠️ WARNING: Detected old domain (laporkampus.kasyifana.my.id) in attachment URLs!');
     }
     
@@ -203,11 +191,11 @@ const updateReportRequest = async (reportId, payload) => {
   const body = JSON.stringify(payload);
   const headers = {
     'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Origin': window.location.origin
   };
-  const directHeaders = { ...headers, 'Origin': window.location.origin };
 
-  const directApiUrl = `https://laravel.kasyifana.my.id/api/laporan/${reportId}`;
+  const apiUrl = `https://laravel.kasyifana.my.id/api/laporan/${reportId}`;
 
   let lastResponse;
 
@@ -222,9 +210,9 @@ const updateReportRequest = async (reportId, payload) => {
   };
 
   try {
-    // Direct API call
-    console.log('Attempting request via direct API...');
-    lastResponse = await tryRequestMethods(directApiUrl, { headers: directHeaders, body, mode: 'cors' });
+    // Direct API call to Laravel backend
+    console.log('Attempting request via Laravel API...');
+    lastResponse = await tryRequestMethods(apiUrl, { headers, body, mode: 'cors' });
   } catch (error) {
     console.error('A network error occurred:', error);
     throw new Error('Gagal terhubung ke server. Periksa koneksi internet Anda.');
@@ -282,13 +270,14 @@ export default function ReportsManagement() {
         return;
       }
       
-      console.log('Fetching user profile...');
-      // Direct API call
+      console.log('Fetching user profile from Laravel API...');
+      // Direct API call to Laravel backend
       const response = await fetch('https://laravel.kasyifana.my.id/api/profile', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Origin': window.location.origin
         },
         mode: 'cors'
       });
@@ -317,7 +306,7 @@ export default function ReportsManagement() {
         return;
       }
 
-      // Use direct API endpoint to fetch all reports
+      // Use Laravel API endpoint to fetch all reports
       const apiUrl = `https://laravel.kasyifana.my.id/api/laporan`;
       
       const response = await fetch(apiUrl, {
@@ -325,34 +314,13 @@ export default function ReportsManagement() {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Origin': window.location.origin
         },
         mode: 'cors'
       });
 
       if (!response.ok) {
-        // Try fallback approach if API returns 404
-        if (response.status === 404) {
-          console.warn('API endpoint returned 404, trying with direct URL...');
-          
-          const fallbackUrl = 'https://laravel.kasyifana.my.id/api/laporan';
-          const fallbackResponse = await fetch(fallbackUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Origin': window.location.origin
-            },
-            mode: 'cors'
-          });
-          
-          if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            processReportsData(data);
-            return;
-          }
-        }
-        
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
 
