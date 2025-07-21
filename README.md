@@ -27,6 +27,8 @@ Aplikasi ini menggunakan backend **Laravel** yang berjalan secara terpisah. Semu
 
 Pastikan Anda telah menjalankan server backend Laravel sebelum memulai aplikasi frontend ini.
 
+API Laravel dapat di unduh di  [Laravel](https://github.com/kasyifana/laravel12feedback.git)
+
 ## Prasyarat
 
 Pastikan perangkat Anda telah terinstal perangkat lunak berikut:
